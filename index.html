@@ -2,11 +2,19 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" href="/src/assets/school-logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Team Meeting Invitation</title>
+    <meta name="description" content="City College of Tagaytay Centralized Academic Performance Monitoring and Reporting System" />
+    <title>City College of Tagaytay — Academic Performance Monitoring & Reporting System</title>
+    <script>
+      try {
+        document.documentElement.classList.toggle('dark', localStorage.getItem('cct_theme') === 'dark');
+      } catch {
+        document.documentElement.classList.remove('dark');
+      }
+    </script>
   </head>
-  <body>
+  <body class="bg-slate-100 font-sans text-slate-900 antialiased">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

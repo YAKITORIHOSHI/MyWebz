@@ -1,16 +1,62 @@
-# React + Vite
+# CCT Academic Records Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+A responsive React/Vite dashboard for encoding, reviewing, approving, reporting, and backing up City College of Tagaytay academic records.
 
-Currently, two official plugins are available:
+## Improvements in this version
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- Dynamic academic-year entry and filtering instead of a fixed two-year list
+- Mobile, tablet, and desktop layouts for the dashboard, records, reports, accounts, navigation, and dialogs
+- Formal record workflow: **Head submission -> Dean review -> approved reporting**
+- Dean review actions for records within the dean's assigned department
+- VPAA full administrative authority across records, approvals, accounts, backups, and system reset
+- President read-only institutional oversight
+- Reports and official dashboard metrics use approved records only
+- Returned-for-revision notes, audit logging, passing-rate calculations, and outcome validation
+- Legacy Realtime Database records are normalized into the current academic-year/status model
+- Unified elevation system for cards, controls, menus, notices, tables, charts, and dialogs
+- Page slide-ins, staggered section reveals, animated drawers/dropdowns/modals, and subtle ambient motion
+- Pointer-aware hover lift effects that remain stable on touch devices
+- Reduced-motion support for users who disable interface animation at the operating-system level
 
-## React Compiler
+## Role matrix
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+| Role | Records | Approval | Accounts | Backups | Reports |
+| --- | --- | --- | --- | --- | --- |
+| VPAA | Create, edit, delete all | Approve/return all | Full control | Full control | All departments |
+| President | Read-only | None | None | None | All departments |
+| Deans | Create/edit assigned department | Approve/return assigned department | None | None | Assigned department |
+| Heads | Create and revise own department records | Submit to dean | None | None | Assigned department |
 
-## Expanding the Oxlint configuration
+## Demo workflow
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+1. Switch to a **Heads** account and encode a record. It enters `Pending Dean Approval`.
+2. Switch to the matching **Deans** account and approve it or return it with a review note.
+3. Approved records become available in official reports and approved-only dashboard KPIs.
+4. Switch to **VPAA** to edit any record, administer accounts, or manage backups.
+
+The seed data includes `head_informatics@gmail.com` and a pending Informatics record for review.
+
+## Local development
+
+Use a fresh dependency installation for the operating system where the project will run:
+
+```bash
+npm install
+npm run dev
+```
+
+Production build:
+
+```bash
+npm run build
+```
+
+The application can run with local demo data. Add the Vite Firebase environment variables used by `src/firebase/config.js` to enable Firebase Authentication and Realtime Database synchronization.
+
+
+## Contrast and elevation correction
+
+- Tailwind dark-mode utilities now follow the application theme toggle instead of the operating-system preference.
+- Cards, tables, filters, dropdowns, and header controls use opaque surfaces.
+- Lift is created with neutral shadows and a restrained 2px hover translation.
+- Decorative sheen was removed from container panels to preserve text contrast.

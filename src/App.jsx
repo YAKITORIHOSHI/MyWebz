@@ -1,306 +1,96 @@
-import { useRef } from 'react'
-import {
-  BellRing,
-  CalendarDays,
-  ClipboardCheck,
-  Clock3,
-  Coffee,
-  MapPin,
-  MessageCircle,
-  Sparkles,
-  Stars,
-  Video,
-  Zap,
-} from 'lucide-react'
-import './App.css'
+import React, { useEffect, useState } from 'react';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { Navbar } from './components/layout/Navbar';
+import { Sidebar } from './components/layout/Sidebar';
+import { DashboardPage } from './pages/DashboardPage';
+import { RecordsPage } from './pages/RecordsPage';
+import { ReportsPage } from './pages/ReportsPage';
+import { AccountsPage } from './pages/AccountsPage';
+import { BackupPage } from './pages/BackupPage';
+import { SettingsPage } from './pages/SettingsPage';
+import { LoginPage } from './pages/LoginPage';
 
-const details = [
-  {
-    icon: CalendarDays,
-    label: 'Date',
-    value: 'August 1, 2026',
-  },
-  {
-    icon: Clock3,
-    label: 'Time',
-    value: '10:00 PM',
-  },
-  {
-    icon: MapPin,
-    label: 'Place',
-    value: 'See you there',
-  },
-]
+const AppContent = () => {
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('cct_theme') === 'dark');
+  const { currentUser, isAuthenticated, permissions } = useAuth();
 
-const confetti = [
-  ['6%', '12%', '0s', 'coral', '18deg'],
-  ['15%', '82%', '1.2s', 'mint', '54deg'],
-  ['21%', '24%', '0.6s', 'sun', '104deg'],
-  ['31%', '72%', '1.8s', 'violet', '132deg'],
-  ['43%', '16%', '0.3s', 'mint', '76deg'],
-  ['52%', '88%', '1.5s', 'coral', '20deg'],
-  ['64%', '21%', '0.9s', 'sun', '148deg'],
-  ['73%', '78%', '2.1s', 'violet', '88deg'],
-  ['82%', '33%', '0.4s', 'coral', '44deg'],
-  ['93%', '64%', '1.1s', 'mint', '118deg'],
-]
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDarkMode);
+    localStorage.setItem('cct_theme', isDarkMode ? 'dark' : 'light');
+  }, [isDarkMode]);
 
-const backgroundObjects = [
-  [CalendarDays, '8%', '27%', '0s', 'coral', '-12deg', '18s'],
-  [Clock3, '19%', '66%', '-3s', 'violet', '9deg', '21s'],
-  [Video, '77%', '18%', '-6s', 'mint', '14deg', '19s'],
-  [ClipboardCheck, '86%', '72%', '-9s', 'sun', '-10deg', '23s'],
-  [MessageCircle, '6%', '78%', '-11s', 'mint', '7deg', '20s'],
-  [Coffee, '91%', '36%', '-14s', 'coral', '15deg', '24s'],
-  [Zap, '33%', '13%', '-17s', 'violet', '-8deg', '22s'],
-]
-
-const lightTrails = [
-  ['-14%', '16%', '17deg', '0s', '10s', 'coral'],
-  ['-20%', '42%', '-9deg', '-2.4s', '12s', 'mint'],
-  ['-18%', '73%', '22deg', '-5.1s', '11s', 'violet'],
-  ['78%', '8%', '106deg', '-3.8s', '13s', 'sun'],
-  ['82%', '63%', '71deg', '-7s', '12.5s', 'mint'],
-]
-
-const energyShapes = [
-  ['12%', '49%', 'square', 'coral', '0s', '16deg', '8s'],
-  ['28%', '19%', 'diamond', 'mint', '-1.8s', '-18deg', '9s'],
-  ['39%', '82%', 'pill', 'violet', '-3.3s', '30deg', '10s'],
-  ['61%', '14%', 'triangle', 'sun', '-5.2s', '-7deg', '8.8s'],
-  ['71%', '86%', 'square', 'mint', '-6.4s', '18deg', '11s'],
-  ['89%', '52%', 'diamond', 'coral', '-4.6s', '-25deg', '9.5s'],
-]
-
-const flowTiles = [
-  ['10%', '18%', '0s', 'coral', '18deg', '14s'],
-  ['24%', '77%', '-3s', 'mint', '-10deg', '16s'],
-  ['43%', '27%', '-6s', 'violet', '12deg', '15s'],
-  ['58%', '84%', '-9s', 'sun', '-16deg', '17s'],
-  ['76%', '22%', '-12s', 'mint', '24deg', '14.5s'],
-  ['91%', '66%', '-15s', 'coral', '-22deg', '18s'],
-]
-
-function App() {
-  const pageRef = useRef(null)
-
-  function handlePointerMove(event) {
-    const page = pageRef.current
-
-    if (!page) {
-      return
+  useEffect(() => {
+    if ((activeTab === 'accounts' && !permissions.canManageAccounts)
+      || (activeTab === 'backup' && !permissions.canManageBackups)) {
+      setActiveTab('dashboard');
     }
+    setIsMobileMenuOpen(false);
+  }, [currentUser?.id, activeTab, permissions.canManageAccounts, permissions.canManageBackups]);
 
-    page.style.setProperty('--mouse-x', `${event.clientX}px`)
-    page.style.setProperty('--mouse-y', `${event.clientY}px`)
-  }
+  if (!isAuthenticated) return <LoginPage />;
 
-  function handlePointerLeave() {
-    const page = pageRef.current
-
-    if (!page) {
-      return
+  const renderActiveTab = () => {
+    switch (activeTab) {
+      case 'records':
+        return <RecordsPage />;
+      case 'reports':
+        return <ReportsPage isDarkMode={isDarkMode} />;
+      case 'accounts':
+        return permissions.canManageAccounts
+          ? <AccountsPage />
+          : <DashboardPage setActiveTab={setActiveTab} isDarkMode={isDarkMode} />;
+      case 'backup':
+        return permissions.canManageBackups
+          ? <BackupPage />
+          : <DashboardPage setActiveTab={setActiveTab} isDarkMode={isDarkMode} />;
+      case 'settings':
+        return <SettingsPage />;
+      case 'dashboard':
+      default:
+        return <DashboardPage setActiveTab={setActiveTab} isDarkMode={isDarkMode} />;
     }
+  };
 
-    page.style.setProperty('--mouse-x', '50vw')
-    page.style.setProperty('--mouse-y', '50vh')
-  }
+
 
   return (
-    <main
-      className="invite-page"
-      ref={pageRef}
-      onPointerMove={handlePointerMove}
-      onPointerLeave={handlePointerLeave}
-      aria-label="Team meeting invitation"
-    >
-      <div className="stage-lights" aria-hidden="true" />
-      <div className="beat-grid" aria-hidden="true" />
-      <div className="motion-ribbons" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </div>
-      <div className="confetti-field" aria-hidden="true">
-        {confetti.map(([left, top, delay, color, angle], index) => (
-          <span
-            className={`confetti confetti-${color}`}
-            key={`${left}-${top}`}
-            style={{
-              '--left': left,
-              '--top': top,
-              '--delay': delay,
-              '--angle': angle,
-              '--drift': `${index % 2 === 0 ? 1 : -1}`,
-            }}
-          />
-        ))}
-      </div>
-      <div className="kinetic-background" aria-hidden="true">
-        <div className="mega-frame mega-frame-one" />
-        <div className="mega-frame mega-frame-two" />
-        <div className="scanner-line" />
-        {backgroundObjects.map(
-          ([Icon, left, top, delay, tone, rotation, duration], index) => (
-            <div
-              className={`kinetic-object kinetic-object-${tone}`}
-              key={`${left}-${top}`}
-              style={{
-                '--object-left': left,
-                '--object-top': top,
-                '--object-delay': delay,
-                '--object-rotation': rotation,
-                '--object-duration': duration,
-                '--object-direction': index % 2 === 0 ? 1 : -1,
-              }}
-            >
-              <Icon size={28} strokeWidth={2.2} />
-              <span />
-              <span />
-            </div>
-          ),
-        )}
-      </div>
-      <div className="animation-layer" aria-hidden="true">
-        <div className="signal-stack">
-          <span />
-          <span />
-          <span />
-        </div>
-        <div className="trail-system">
-          {lightTrails.map(([left, top, rotate, delay, duration, tone]) => (
-            <span
-              className={`light-trail light-trail-${tone}`}
-              key={`${left}-${top}`}
-              style={{
-                '--trail-left': left,
-                '--trail-top': top,
-                '--trail-rotate': rotate,
-                '--trail-delay': delay,
-                '--trail-duration': duration,
-              }}
-            />
-          ))}
-        </div>
-        <div className="shape-system">
-          {energyShapes.map(([left, top, form, tone, delay, rotate, duration]) => (
-            <span
-              className={`energy-shape energy-shape-${form} energy-shape-${tone}`}
-              key={`${left}-${top}-${form}`}
-              style={{
-                '--shape-left': left,
-                '--shape-top': top,
-                '--shape-delay': delay,
-                '--shape-rotate': rotate,
-                '--shape-duration': duration,
-              }}
-            />
-          ))}
-        </div>
-      </div>
-      <div className="background-cinema" aria-hidden="true">
-        <div className="flow-lane flow-lane-one">
-          <span />
-          <span />
-          <span />
-        </div>
-        <div className="flow-lane flow-lane-two">
-          <span />
-          <span />
-          <span />
-        </div>
-        <div className="flow-lane flow-lane-three">
-          <span />
-          <span />
-          <span />
-        </div>
-        {flowTiles.map(([left, top, delay, tone, rotate, duration]) => (
-          <span
-            className={`flow-tile flow-tile-${tone}`}
-            key={`${left}-${top}`}
-            style={{
-              '--tile-left': left,
-              '--tile-top': top,
-              '--tile-delay': delay,
-              '--tile-rotate': rotate,
-              '--tile-duration': duration,
-            }}
-          />
-        ))}
-      </div>
+    <div className={`app-shell min-h-screen font-sans transition-colors duration-300 ${
+      isDarkMode ? 'dark bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-900'
+    }`}>
+      <Navbar
+        setActiveTab={setActiveTab}
+        isMobileMenuOpen={isMobileMenuOpen}
+        setIsMobileMenuOpen={setIsMobileMenuOpen}
+        isDarkMode={isDarkMode}
+        setIsDarkMode={setIsDarkMode}
+      />
 
-      <div className="card-shell">
-        <div className="orbit-lines" aria-hidden="true">
-          <span />
-          <span />
-        </div>
-
-        <section className="invite-card">
-          <div className="card-glow" aria-hidden="true" />
-          <div className="spark-burst" aria-hidden="true">
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
-            <span />
+      <div className="mx-auto flex w-full max-w-[1920px] gap-4 px-3 py-3 sm:gap-5 sm:px-5 sm:py-5 lg:px-7 xl:gap-6 xl:px-10">
+        <Sidebar
+          activeTab={activeTab}
+          setActiveTab={(tab) => {
+            setActiveTab(tab);
+            setIsMobileMenuOpen(false);
+          }}
+          isMobileMenuOpen={isMobileMenuOpen}
+          setIsMobileMenuOpen={setIsMobileMenuOpen}
+        />
+        <main className="min-w-0 flex-1 pb-8">
+          <div key={`${activeTab}-${currentUser?.id}`} className="page-transition">
+            {renderActiveTab()}
           </div>
-
-          <div className="invite-card__header">
-            <div className="eyebrow">
-              <Sparkles size={16} strokeWidth={2.4} aria-hidden="true" />
-              <span>You're invited</span>
-            </div>
-            <div className="status-chip">
-              <span className="status-dot" aria-hidden="true" />
-              Team sync
-            </div>
-          </div>
-
-          <div className="headline-wrap">
-            <Stars className="headline-star" size={34} strokeWidth={1.8} />
-            <h1>
-              Team <span>Meeting</span>
-            </h1>
-            <div className="beat-bars" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-              <span />
-              <span />
-            </div>
-          </div>
-
-          <p className="intro">
-            A bright little checkpoint for updates, alignment, and good energy.
-            Please make sure to join on time.
-          </p>
-
-          <div className="details" id="details">
-            {details.map(({ icon: Icon, label, value }) => (
-              <article className="detail-row" key={label}>
-                <div className="detail-icon">
-                  <Icon size={21} strokeWidth={2.2} aria-hidden="true" />
-                </div>
-                <div>
-                  <p>{label}</p>
-                  <strong>{value}</strong>
-                </div>
-              </article>
-            ))}
-          </div>
-
-          <div className="reminder">
-            <BellRing size={20} strokeWidth={2.3} aria-hidden="true" />
-            <p>
-              <strong>Don't be late!</strong>
-              <span>See you soon, ready and cheerful.</span>
-            </p>
-          </div>
-        </section>
+        </main>
       </div>
-    </main>
-  )
+    </div>
+  );
+};
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
 }
-
-export default App
