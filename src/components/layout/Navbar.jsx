@@ -30,7 +30,7 @@ const roleBadgeClass = (role) => {
 };
 
 export const Navbar = ({ setActiveTab, isMobileMenuOpen, setIsMobileMenuOpen, isDarkMode, setIsDarkMode }) => {
-  const { currentUser, logout } = useAuth();
+  const { currentUser, logout, rtdbLiveTicker } = useAuth();
 
   const [showUserDropdown, setShowUserDropdown] = useState(false);
   const dropdownRef = useRef(null);

@@ -254,11 +254,12 @@ export const AuthProvider = ({ children }) => {
 
     const unsubAuditLogs = onValue(rtdbRef(rtdb, 'auditLogs'), (snapshot) => {
       const list = parseRtdbSnapshot(snapshot);
-      setAuditLogs(list.reverse());
+      setAuditLogs([...list].reverse());
     });
 
     const unsubTicker = onValue(rtdbRef(rtdb, 'activityTicker'), (snapshot) => {
-      setRtdbLiveTicker(parseRtdbSnapshot(snapshot).reverse().slice(0, 5));
+      const list = parseRtdbSnapshot(snapshot);
+      setRtdbLiveTicker([...list].reverse().slice(0, 5));
     });
 
     return () => {
