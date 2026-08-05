@@ -38,4 +38,4 @@ try {
   console.warn("Firebase initialization error:", error);
 }
 
-export { app, auth, rtdb, isFirebaseInitialized, KEEP_SIGNED_IN_KEY };
+export { app, auth, rtdb, firebaseConfig, isFirebaseInitialized, KEEP_SIGNED_IN_KEY };

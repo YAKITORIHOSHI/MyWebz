@@ -49,6 +49,7 @@ export const AccountsPage = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    password: '',
     role: 'Heads',
     department: departments[0]
   });
@@ -71,18 +72,18 @@ export const AccountsPage = () => {
   const openAddModal = () => {
     setEditingUser(null);
     setFormError('');
-    setFormData({ name: '', email: '', role: 'Heads', department: departments[0] });
+    setFormData({ name: '', email: '', password: '', role: 'Heads', department: departments[0] });
     setIsModalOpen(true);
   };
 
   const openEditModal = (user) => {
     setEditingUser(user);
     setFormError('');
-    setFormData({ name: user.name, email: user.email, role: user.role, department: user.department });
+    setFormData({ name: user.name, email: user.email, password: '', role: user.role, department: user.department });
     setIsModalOpen(true);
   };
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     setFormError('');
     const normalizedEmail = formData.email.trim().toLowerCase();
@@ -93,8 +94,8 @@ export const AccountsPage = () => {
     }
 
     const result = editingUser
-      ? updateAccount(editingUser.id, { ...formData, email: normalizedEmail })
-      : addAccount({ ...formData, email: normalizedEmail });
+      ? await updateAccount(editingUser.id, { ...formData, email: normalizedEmail })
+      : await addAccount({ ...formData, email: normalizedEmail });
 
     if (!result?.success) {
       setFormError(result?.message || 'The account could not be saved.');
@@ -209,6 +210,9 @@ export const AccountsPage = () => {
               {formError && <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300">{formError}</div>}
               <label><span className="form-label">Full name / office name</span><input type="text" required value={formData.name} onChange={(event) => setFormData({ ...formData, name: event.target.value })} className="form-control" /></label>
               <label><span className="form-label">Institutional email</span><input type="email" required placeholder="name@citycollegeoftagaytay.edu.ph" value={formData.email} onChange={(event) => setFormData({ ...formData, email: event.target.value })} className="form-control" /></label>
+              {!editingUser && (
+                <label><span className="form-label">Initial Password</span><input type="password" required minLength={6} placeholder="Assign initial password (min. 6 characters)" value={formData.password} onChange={(event) => setFormData({ ...formData, password: event.target.value })} className="form-control" /></label>
+              )}
               <label><span className="form-label">Role assignment</span><select value={formData.role} onChange={(event) => setFormData({ ...formData, role: event.target.value })} className="form-control">{Object.keys(ROLE_STYLES).map((role) => <option key={role} value={role}>{role} — {roleDescription[role]}</option>)}</select></label>
               <label><span className="form-label">Department scope</span><select value={formData.department} onChange={(event) => setFormData({ ...formData, department: event.target.value })} className="form-control">{departmentOptions.map((department) => <option key={department} value={department}>{department}</option>)}</select></label>
               <div className="flex flex-col-reverse gap-2 pt-3 sm:flex-row sm:justify-end"><button type="button" onClick={() => setIsModalOpen(false)} className="control-lift min-h-11 rounded-xl bg-slate-100 px-4 text-xs font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300">Cancel</button><button type="submit" className="primary-action button-shine min-h-11 rounded-xl bg-violet-600 px-5 text-xs font-bold text-white hover:bg-violet-700">{editingUser ? 'Save Changes' : 'Create Account'}</button></div>

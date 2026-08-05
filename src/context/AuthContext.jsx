@@ -1,9 +1,10 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { initializeApp, deleteApp } from 'firebase/app';
 import { RECORD_STATUS, CCT_DEPARTMENTS, normalizeAcademicYear } from '../utils/academic';
-import { auth, rtdb, isFirebaseInitialized, KEEP_SIGNED_IN_KEY } from '../firebase/config';
+import { auth, rtdb, firebaseConfig, isFirebaseInitialized, KEEP_SIGNED_IN_KEY } from '../firebase/config';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  getAuth,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   setPersistence,
@@ -413,12 +414,34 @@ export const AuthProvider = ({ children }) => {
     return true;
   };
 
-  const addAccount = (accountData) => {
+  const addAccount = async (accountData) => {
     if (!permissions.canManageAccounts) return { success: false, message: 'Only the VPAA can create accounts.' };
+
+    const { name, email, password, role, department } = accountData;
+
+    // Register user directly in Firebase Authentication if password provided
+    if (isFirebaseInitialized && password) {
+      try {
+        const secondaryApp = initializeApp(firebaseConfig, `AuthWorker_${Date.now()}`);
+        const secondaryAuth = getAuth(secondaryApp);
+        await createUserWithEmailAndPassword(secondaryAuth, email, password);
+        await deleteApp(secondaryApp).catch(() => {});
+      } catch (error) {
+        let message = 'Firebase Authentication user creation failed.';
+        if (error.code === 'auth/email-already-in-use') message = 'An account with this email already exists in Firebase Auth.';
+        else if (error.code === 'auth/weak-password') message = 'Password should be at least 6 characters.';
+        else if (error.code === 'auth/invalid-email') message = 'Invalid email address format.';
+        else if (error.message) message = error.message.replace(/^Firebase:\s*/, '');
+        return { success: false, message };
+      }
+    }
 
     const newAccount = {
       id: `usr_${Date.now()}`,
-      ...accountData,
+      name,
+      email,
+      role,
+      department,
       status: 'Active',
       createdAt: new Date().toISOString().split('T')[0],
       lastLogin: 'Never'
