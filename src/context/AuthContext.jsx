@@ -1,13 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import {
-  INITIAL_ACCOUNTS,
-  INITIAL_RECORDS,
-  INITIAL_BACKUPS,
-  INITIAL_AUDIT_LOGS,
-  CCT_DEPARTMENTS,
-  INITIAL_SUBJECT_CATALOG
-} from '../firebase/seedData';
-import { RECORD_STATUS, normalizeAcademicYear } from '../utils/academic';
+import { RECORD_STATUS, CCT_DEPARTMENTS, normalizeAcademicYear } from '../utils/academic';
 import { auth, rtdb, isFirebaseInitialized, KEEP_SIGNED_IN_KEY } from '../firebase/config';
 import {
   signInWithEmailAndPassword,
@@ -42,12 +34,12 @@ const readStoredCollection = (key, fallback) => {
 const timestamp = () => new Date().toISOString().replace('T', ' ').substring(0, 19);
 
 export const AuthProvider = ({ children }) => {
-  const [accounts, setAccounts] = useState(() => readStoredCollection('cct_accounts', INITIAL_ACCOUNTS));
+  const [accounts, setAccounts] = useState(() => readStoredCollection('cct_accounts', []));
   const [records, setRecords] = useState(() => readStoredCollection('cct_records', []));
   const [backups, setBackups] = useState(() => readStoredCollection('cct_backups', []));
   const [auditLogs, setAuditLogs] = useState(() => readStoredCollection('cct_audit_logs', []));
   const [departments, setDepartments] = useState(() => readStoredCollection('cct_departments', CCT_DEPARTMENTS));
-  const [subjectCatalog, setSubjectCatalog] = useState(() => readStoredCollection('cct_subject_catalog', INITIAL_SUBJECT_CATALOG));
+  const [subjectCatalog, setSubjectCatalog] = useState(() => readStoredCollection('cct_subject_catalog', []));
   const [rtdbLiveTicker, setRtdbLiveTicker] = useState([]);
 
   // Every app update/refresh defaults to logged out state on login screen
@@ -196,34 +188,22 @@ export const AuthProvider = ({ children }) => {
 
     const unsubAccounts = onValue(rtdbRef(rtdb, 'accounts'), (snapshot) => {
       const list = parseRtdbSnapshot(snapshot);
-      if (list.length > 0) {
-        setAccounts(list);
-        setCurrentUser((previous) => (previous ? (list.find((account) => account.id === previous.id) || previous) : null));
-      } else {
-        const map = {};
-        INITIAL_ACCOUNTS.forEach((acc) => { map[acc.id] = acc; });
-        rtdbSet(rtdbRef(rtdb, 'accounts'), map).catch(console.warn);
-      }
+      setAccounts(list);
+      setCurrentUser((previous) => (previous ? (list.find((account) => account.id === previous.id) || previous) : null));
     });
 
     const unsubRequests = onValue(rtdbRef(rtdb, 'requests'), (snapshot) => {
       const list = parseRtdbSnapshot(snapshot);
-      if (list.length > 0) {
-        setRecords(list.map((record) => ({
-          ...record,
-          academicYear: normalizeAcademicYear(record.academicYear),
-          status: record.status || RECORD_STATUS.APPROVED,
-          droppedCount: Number.parseInt(record.droppedCount, 10) || 0,
-          incCount: Number.parseInt(record.incCount, 10) || 0,
-          approvedBy: record.approvedBy || (record.status ? '' : 'Legacy data migration'),
-          approvedAt: record.approvedAt || '',
-          reviewNote: record.reviewNote || ''
-        })));
-      } else {
-        const map = {};
-        INITIAL_RECORDS.forEach((rec) => { map[rec.id] = rec; });
-        rtdbSet(rtdbRef(rtdb, 'requests'), map).catch(console.warn);
-      }
+      setRecords(list.map((record) => ({
+        ...record,
+        academicYear: normalizeAcademicYear(record.academicYear),
+        status: record.status || RECORD_STATUS.APPROVED,
+        droppedCount: Number.parseInt(record.droppedCount, 10) || 0,
+        incCount: Number.parseInt(record.incCount, 10) || 0,
+        approvedBy: record.approvedBy || '',
+        approvedAt: record.approvedAt || '',
+        reviewNote: record.reviewNote || ''
+      })));
     });
 
     const unsubDepartments = onValue(rtdbRef(rtdb, 'departments'), (snapshot) => {
@@ -231,20 +211,12 @@ export const AuthProvider = ({ children }) => {
       if (list.length > 0) {
         const deptNames = list.map((item) => (typeof item === 'string' ? item : item.name || item.id)).filter(Boolean);
         if (deptNames.length > 0) setDepartments(deptNames);
-      } else {
-        rtdbSet(rtdbRef(rtdb, 'departments'), CCT_DEPARTMENTS).catch(console.warn);
       }
     });
 
     const unsubSubjects = onValue(rtdbRef(rtdb, 'subjects'), (snapshot) => {
       const list = parseRtdbSnapshot(snapshot);
-      if (list.length > 0) {
-        setSubjectCatalog(list);
-      } else {
-        const map = {};
-        INITIAL_SUBJECT_CATALOG.forEach((subj) => { map[subj.id] = subj; });
-        rtdbSet(rtdbRef(rtdb, 'subjects'), map).catch(console.warn);
-      }
+      setSubjectCatalog(list);
     });
 
     const unsubBackups = onValue(rtdbRef(rtdb, 'backups'), (snapshot) => {
@@ -764,24 +736,11 @@ export const AuthProvider = ({ children }) => {
 
   const resetToSeedData = () => {
     if (!permissions.isVPAA) return { success: false, message: 'Only the VPAA can reset system data.' };
-    setAccounts(INITIAL_ACCOUNTS);
-    setRecords(INITIAL_RECORDS);
-    setBackups(INITIAL_BACKUPS);
-    setAuditLogs(INITIAL_AUDIT_LOGS);
     setDepartments(CCT_DEPARTMENTS);
-    setSubjectCatalog(INITIAL_SUBJECT_CATALOG);
-    setCurrentUser(INITIAL_ACCOUNTS[0]);
-    localStorage.setItem('cct_data_version', DATA_VERSION);
     if (isFirebaseInitialized && rtdb) {
-      const accMap = {}; INITIAL_ACCOUNTS.forEach((a) => { accMap[a.id] = a; });
-      const recMap = {}; INITIAL_RECORDS.forEach((r) => { recMap[r.id] = r; });
-      const subjMap = {}; INITIAL_SUBJECT_CATALOG.forEach((s) => { subjMap[s.id] = s; });
-      rtdbSet(rtdbRef(rtdb, 'accounts'), accMap).catch(console.warn);
-      rtdbSet(rtdbRef(rtdb, 'requests'), recMap).catch(console.warn);
       rtdbSet(rtdbRef(rtdb, 'departments'), CCT_DEPARTMENTS).catch(console.warn);
-      rtdbSet(rtdbRef(rtdb, 'subjects'), subjMap).catch(console.warn);
     }
-    addAuditLog('System Reset', 'Reset database to the CCT seed dataset.');
+    addAuditLog('System Reset', 'Reset department catalog.');
     return { success: true };
   };
 

@@ -102,7 +102,7 @@ export const LoginPage = () => {
                 <input
                   type="email"
                   required
-                  placeholder="user@cct.edu.ph"
+                  placeholder="user@citycollegeoftagaytay.edu.ph"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="login-input w-full pl-9.5 pr-3 py-2.5 bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none"
