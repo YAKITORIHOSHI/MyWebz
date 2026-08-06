@@ -24,3 +24,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Database dumps
+current-fdbs.json
+*-fdbs.json
+
