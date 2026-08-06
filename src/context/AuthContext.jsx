@@ -352,23 +352,10 @@ export const AuthProvider = ({ children }) => {
         const snapshot = await rtdbGet(rtdbRef(rtdb, 'accounts'));
         let list = parseRtdbSnapshot(snapshot);
 
-        // Fetch user avatars from Firebase RTDB user_avatars node
-        try {
-          const avatarsSnap = await rtdbGet(rtdbRef(rtdb, 'user_avatars'));
-          const avatarsMap = avatarsSnap.val() || {};
-          list = list.map((acc) => {
-            const emailKey = acc.email?.toLowerCase()?.replace(/[\.\#\$\[\]]/g, '_');
-            const rtdbAvatar = avatarsMap[emailKey] || '';
-            const cachedByEmail = acc.email ? localStorage.getItem(`nci_avatar_${acc.email.toLowerCase()}`) : null;
-            const cachedById = acc.id ? localStorage.getItem(`nci_user_avatar_${acc.id}`) : null;
-            return {
-              ...acc,
-              avatarUrl: acc.avatarUrl || rtdbAvatar || cachedByEmail || cachedById || ''
-            };
-          });
-        } catch (e) {
-          console.warn('Avatars fetch note:', e);
-        }
+        list = list.map((acc) => ({
+          ...acc,
+          avatarUrl: acc.avatarUrl || (acc.id ? localStorage.getItem(`nci_user_avatar_${acc.id}`) || '' : '')
+        }));
 
         accountsRef.current = list;
         setAccounts(list);
@@ -454,26 +441,13 @@ export const AuthProvider = ({ children }) => {
     const startSubscriptions = () => {
       if (cancelled) return;
 
-      subscriptions.push(onValue(rtdbRef(rtdb, 'accounts'), async (snapshot) => {
+      subscriptions.push(onValue(rtdbRef(rtdb, 'accounts'), (snapshot) => {
         let list = parseRtdbSnapshot(snapshot);
 
-        // Fetch user avatars from Firebase RTDB user_avatars node
-        try {
-          const avatarsSnap = await rtdbGet(rtdbRef(rtdb, 'user_avatars'));
-          const avatarsMap = avatarsSnap.val() || {};
-          list = list.map((acc) => {
-            const emailKey = acc.email?.toLowerCase()?.replace(/[\.\#\$\[\]]/g, '_');
-            const rtdbAvatar = avatarsMap[emailKey] || '';
-            const cachedByEmail = acc.email ? localStorage.getItem(`nci_avatar_${acc.email.toLowerCase()}`) : null;
-            const cachedById = acc.id ? localStorage.getItem(`nci_user_avatar_${acc.id}`) : null;
-            return {
-              ...acc,
-              avatarUrl: acc.avatarUrl || rtdbAvatar || cachedByEmail || cachedById || ''
-            };
-          });
-        } catch (e) {
-          console.warn('Avatars fetch note:', e);
-        }
+        list = list.map((acc) => ({
+          ...acc,
+          avatarUrl: acc.avatarUrl || (acc.id ? localStorage.getItem(`nci_user_avatar_${acc.id}`) || '' : '')
+        }));
 
         accountsRef.current = list;
         setAccounts(list);
@@ -485,7 +459,7 @@ export const AuthProvider = ({ children }) => {
           return;
         }
 
-        const cachedAvatar = matched.email ? localStorage.getItem(`nci_avatar_${matched.email.toLowerCase()}`) : null;
+        const cachedAvatar = matched.id ? localStorage.getItem(`nci_user_avatar_${matched.id}`) : null;
         const finalAvatar = matched.avatarUrl || cachedAvatar || '';
         setCurrentUser({ ...matched, avatarUrl: finalAvatar });
         markCollectionReady('accounts');
@@ -626,22 +600,10 @@ export const AuthProvider = ({ children }) => {
       const accountSnapshot = await rtdbGet(rtdbRef(rtdb, 'accounts'));
       let list = parseRtdbSnapshot(accountSnapshot);
 
-      try {
-        const avatarsSnap = await rtdbGet(rtdbRef(rtdb, 'user_avatars'));
-        const avatarsMap = avatarsSnap.val() || {};
-        list = list.map((acc) => {
-          const emailKey = acc.email?.toLowerCase()?.replace(/[\.\#\$\[\]]/g, '_');
-          const rtdbAvatar = avatarsMap[emailKey] || '';
-          const cachedByEmail = acc.email ? localStorage.getItem(`nci_avatar_${acc.email.toLowerCase()}`) : null;
-          const cachedById = acc.id ? localStorage.getItem(`nci_user_avatar_${acc.id}`) : null;
-          return {
-            ...acc,
-            avatarUrl: acc.avatarUrl || rtdbAvatar || cachedByEmail || cachedById || ''
-          };
-        });
-      } catch (e) {
-        console.warn('Avatars fetch note:', e);
-      }
+      list = list.map((acc) => ({
+        ...acc,
+        avatarUrl: acc.avatarUrl || (acc.id ? localStorage.getItem(`nci_user_avatar_${acc.id}`) || '' : '')
+      }));
 
       accountsRef.current = list;
       setAccounts(list);
@@ -834,20 +796,7 @@ export const AuthProvider = ({ children }) => {
       // Add timestamp cache-buster so browsers immediately reload updated avatars
       const avatarUrl = `${baseUrl}?v=${Date.now()}`;
 
-      // 1. Sync avatar URL to Firebase Realtime Database under user_avatars node
-      const emailKey = currentUser.email?.toLowerCase()?.replace(/[\.\#\$\[\]]/g, '_');
-      if (isFirebaseInitialized && rtdb && emailKey) {
-        try {
-          await rtdbSet(rtdbRef(rtdb, `user_avatars/${emailKey}`), avatarUrl);
-        } catch (e) {
-          console.warn('user_avatars RTDB sync:', e);
-        }
-      }
-
-      // 2. Cache avatar URL locally by email and user ID
-      if (currentUser.email) {
-        try { localStorage.setItem(`nci_avatar_${currentUser.email.toLowerCase()}`, avatarUrl); } catch (e) {}
-      }
+      // Cache avatar URL locally by user ID only
       if (currentUser.id) {
         try { localStorage.setItem(`nci_user_avatar_${currentUser.id}`, avatarUrl); } catch (e) {}
       }
