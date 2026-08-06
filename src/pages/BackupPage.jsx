@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { Toast } from '../components/common/Feedback';
+import { Modal } from '../components/common/Modal';
 import { 
   HardDriveDownload, 
   RotateCcw, 
@@ -18,13 +20,16 @@ import {
 } from 'lucide-react';
 
 export const BackupPage = () => {
-  const { backups, records, createBackup, restoreBackup, updateRecord, syncRecord, permissions, isFirebaseConnected } = useAuth();
+  const { currentUser, backups, records, createBackup, restoreBackup, updateRecord, permissions, isFirebaseConnected } = useAuth();
 
   const [restoreModalOpen, setRestoreModalOpen] = useState(false);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [selectedBackup, setSelectedBackup] = useState(null);
   const [uploadJsonContent, setUploadJsonContent] = useState('');
   const [restoreStatus, setRestoreStatus] = useState(null);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [isCreatingBackup, setIsCreatingBackup] = useState(false);
+  const [notice, setNotice] = useState(null);
 
   // Selective Record Recovery states
   const [selectedRecordId, setSelectedRecordId] = useState(null);
@@ -34,37 +39,62 @@ export const BackupPage = () => {
   if (!permissions.canManageBackups) return null;
 
   // Trigger manual backup
-  const handleCreateManualBackup = () => {
-    const result = createBackup('Manual Export');
+  const handleCreateManualBackup = async () => {
+    if (isCreatingBackup) return;
+    setIsCreatingBackup(true);
+    const result = await createBackup('Manual Export');
+    setIsCreatingBackup(false);
     if (!result?.success) {
-      alert(result?.message || 'The backup could not be created.');
+      setNotice({ type: 'error', message: result?.message || 'The backup could not be created.' });
       return;
     }
-    alert(`Backup successfully generated: ${result.backup.fileName}\nThe snapshot JSON file has been downloaded and stored in Firebase.`);
+    const syncMessage = result.synchronized
+      ? 'The snapshot was downloaded and synchronized with Firebase.'
+      : 'The snapshot was downloaded locally. Firebase synchronization was skipped because the connection is offline.';
+    setNotice({ type: 'success', message: `Backup successfully generated: ${result.backup.fileName}\n${syncMessage}` });
   };
 
   // File upload handler
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadJsonContent('');
+      setRestoreStatus({ type: 'error', message: 'The selected JSON file exceeds the 10 MB restore limit.' });
+      e.target.value = '';
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = (event) => {
       setUploadJsonContent(event.target.result);
       setRestoreStatus({ type: 'info', message: `Loaded local file: ${file.name}` });
     };
+    reader.onerror = () => {
+      setUploadJsonContent('');
+      setRestoreStatus({ type: 'error', message: 'The selected file could not be read.' });
+    };
     reader.readAsText(file);
   };
 
   // Perform full database restore
-  const handleExecuteRestore = () => {
-    if (!uploadJsonContent && !selectedBackup) {
-      alert('Please select or upload a backup snapshot JSON file first.');
+  const handleExecuteRestore = async () => {
+    if (!uploadJsonContent && !selectedBackup?.rawContent) {
+      setRestoreStatus({
+        type: 'error',
+        message: selectedBackup
+          ? 'This history entry contains metadata only. Upload the original JSON snapshot file to restore it.'
+          : 'Select a restorable snapshot or upload a JSON snapshot file first.'
+      });
       return;
     }
+    if (isRestoring) return;
 
+    setIsRestoring(true);
+    setRestoreStatus({ type: 'info', message: 'Validating and synchronizing the selected snapshot…' });
     const contentToRestore = selectedBackup?.rawContent || uploadJsonContent;
-    const result = restoreBackup(contentToRestore);
+    const result = await restoreBackup(contentToRestore, selectedBackup?.checksum || '');
+    setIsRestoring(false);
 
     if (result.success) {
       setRestoreStatus({ type: 'success', message: result.message });
@@ -79,18 +109,22 @@ export const BackupPage = () => {
     }
   };
 
-  // Selective single record restoration handler
+  // Re-approve and resynchronize the current live record (not a historical restore).
   const selectedRecordObj = records.find((rec) => rec.id === selectedRecordId);
 
   const handleSelectiveRecordRestore = () => {
     if (!selectedRecordObj) return;
-    updateRecord(selectedRecordObj.id, {
+    const result = updateRecord(selectedRecordObj.id, {
       status: 'Approved',
-      approvedBy: 'VPAA Selective Disaster Recovery',
+      approvedBy: currentUser?.name || 'Vice President for Academic Affairs',
       approvedAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
-      reviewNote: 'Record verified and selectively restored from Firebase RTDB.'
+      reviewNote: 'Record manually verified, re-approved, and resynchronized with Firebase RTDB.'
     });
-    setRecordRestoreNotice(`Record ${selectedRecordObj.subjectCode} (${selectedRecordObj.department}) selectively verified and synchronized with Firebase!`);
+    if (!result?.success) {
+      setNotice({ type: 'error', message: result?.message || 'The record could not be resynchronized.' });
+      return;
+    }
+    setRecordRestoreNotice(`Record ${selectedRecordObj.subjectCode} (${selectedRecordObj.department}) was re-approved and synchronized.`);
     setTimeout(() => setRecordRestoreNotice(''), 4000);
   };
 
@@ -108,54 +142,66 @@ export const BackupPage = () => {
     <div className="page-stack space-y-4 sm:space-y-6">
       
       {/* Header */}
-      <div className="surface-panel flex flex-col justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 lg:flex-row lg:items-center shadow-sm">
-        <div>
-          <div className="flex items-center space-x-2 text-indigo-600 dark:text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-1">
-            <HardDriveDownload className="w-4 h-4" />
-            <span>Module 4: Backup, Snapshot & Record Recovery</span>
+      <section className="hero-panel hero-motion relative overflow-hidden rounded-3xl border border-sky-500/30 bg-gradient-to-br from-slate-950 via-blue-950 to-sky-950 p-5 text-white sm:p-6 lg:p-7 shadow-xl shadow-sky-950/40">
+        <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-sky-500/25 blur-3xl" />
+        <div className="absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-blue-600/20 blur-3xl" />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-sky-400">
+              <HardDriveDownload className="h-4 w-4" />
+              Backup, Snapshot & Record Recovery
+            </div>
+            <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Database Security & System Recovery</h1>
+            <p className="mt-2 max-w-3xl text-xs leading-relaxed text-sky-100/90 sm:text-sm">
+              VPAA-only tools for Firebase Realtime Database JSON snapshots, validated local imports, and live-record integrity repair.
+            </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-blue-900/40 px-3 py-1.5 text-[10px] font-bold text-sky-200">
+                <ShieldCheck className="h-3.5 w-3.5 text-sky-400" /> {currentUser?.role}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-blue-900/40 px-3 py-1.5 text-[10px] font-bold text-sky-200">
+                <Database className="h-3.5 w-3.5 text-emerald-400" /> Saved Snapshots: {backups.length}
+              </span>
+            </div>
           </div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Database Security, Snapshots & Record Recovery</h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            VPAA-only tools for Firebase Realtime Database JSON snapshots, local file imports, and selective record restoration.
-          </p>
-        </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedBackup(null);
-              setUploadJsonContent('');
-              setRestoreStatus(null);
-              setRestoreModalOpen(true);
-            }}
-            className="control-lift px-3.5 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-200 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 flex items-center justify-center space-x-1.5 transition"
-          >
-            <Upload className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-            <span>Import Local JSON File</span>
-          </button>
-          
-          <button
-            type="button"
-            onClick={handleCreateManualBackup}
-            className="primary-action button-shine px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl flex items-center justify-center space-x-2 transition shadow-md shadow-indigo-600/20"
-          >
-            <Database className="w-4 h-4" />
-            <span>Create Manual Firebase Snapshot</span>
-          </button>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedBackup(null);
+                setUploadJsonContent('');
+                setRestoreStatus(null);
+                setRestoreModalOpen(true);
+              }}
+              className="glass-control control-lift min-h-11 rounded-xl border border-sky-400/30 bg-blue-950/40 px-4 text-xs font-bold text-sky-200 transition hover:bg-blue-900/60 cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Upload className="h-4 w-4" /> Import Local JSON
+            </button>
+
+            <button
+              type="button"
+              onClick={handleCreateManualBackup}
+              disabled={isCreatingBackup}
+              className="hero-action button-shine inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-400 to-blue-500 hover:from-sky-300 hover:to-blue-400 px-4 text-xs font-black text-slate-950 transition shadow-lg shadow-sky-500/25 cursor-pointer disabled:opacity-50"
+            >
+              <Database className="h-4 w-4" />
+              <span>{isCreatingBackup ? 'Creating Snapshot…' : 'Create Snapshot'}</span>
+            </button>
+          </div>
         </div>
-      </div>
+      </section>
 
       {/* Backup Settings & System Security Status */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         
         <div className="metric-tile rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 space-y-2 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Automated Backup Daemon</span>
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Backup Mode</span>
+            <HardDriveDownload className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
           </div>
-          <div className="text-lg font-bold text-slate-900 dark:text-white">Active & Scheduled</div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">Schedule: Daily at 02:00 AM</p>
+          <div className="text-lg font-bold text-slate-900 dark:text-white">Manual / On-demand</div>
+          <p className="text-xs text-slate-500 dark:text-slate-400">No automated server-side schedule is configured.</p>
         </div>
 
         <div className="metric-tile rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 space-y-2 shadow-sm">
@@ -169,11 +215,11 @@ export const BackupPage = () => {
 
         <div className="metric-tile rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 space-y-2 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Data Security Status</span>
-            <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Firebase Connection</span>
+            <ShieldCheck className={`w-4 h-4 ${isFirebaseConnected ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`} />
           </div>
-          <div className="text-lg font-bold text-emerald-700 dark:text-emerald-400">Encrypted & Verified</div>
-          <p className="text-xs text-slate-500 dark:text-slate-400">JSON & SHA-256 Checksums</p>
+          <div className={`text-lg font-bold ${isFirebaseConnected ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>{isFirebaseConnected ? 'Live' : 'Offline / Reconnecting'}</div>
+          <p className="text-xs text-slate-500 dark:text-slate-400">New exports include a SHA-256 integrity checksum.</p>
         </div>
 
       </div>
@@ -183,11 +229,38 @@ export const BackupPage = () => {
         <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <div>
             <h3 className="text-sm font-bold text-slate-900 dark:text-white">Selectable Database Snapshots</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Click "Restore Snapshot" on any Firebase snapshot to restore full system state</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Snapshots with embedded JSON can be restored; metadata-only entries require the original JSON file</p>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="space-y-3 p-4 md:hidden">
+          {backups.map((bkp) => (
+            <article key={bkp.id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950/60">
+              <div className="flex items-start gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                  <FileCode className="h-4 w-4" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="break-all font-mono text-xs font-bold text-slate-900 dark:text-white">{bkp.fileName}</p>
+                  <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">{bkp.createdAt} · {bkp.fileSize}</p>
+                </div>
+                <span className="rounded-full bg-emerald-100 px-2 py-1 text-[9px] font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">{bkp.status}</span>
+              </div>
+              <dl className="mt-3 grid grid-cols-2 gap-2 text-[10px]">
+                <div className="rounded-lg bg-white p-2 dark:bg-slate-900"><dt className="text-slate-400">Type</dt><dd className="mt-0.5 font-semibold text-slate-700 dark:text-slate-300">{bkp.type}</dd></div>
+                <div className="rounded-lg bg-white p-2 dark:bg-slate-900"><dt className="text-slate-400">Restore data</dt><dd className="mt-0.5 font-semibold text-slate-700 dark:text-slate-300">{bkp.rawContent ? 'Embedded' : 'Metadata only'}</dd></div>
+              </dl>
+              <p className="mt-2 truncate font-mono text-[9px] text-slate-400" title={bkp.checksum}>{bkp.checksum}</p>
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                <button type="button" onClick={() => { setSelectedBackup(bkp); setPreviewModalOpen(true); }} className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-[11px] font-bold text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">Preview</button>
+                <button type="button" onClick={() => { setSelectedBackup(bkp); setRestoreStatus(null); setRestoreModalOpen(true); }} disabled={!bkp.rawContent} className="min-h-10 rounded-xl bg-indigo-600 px-3 text-[11px] font-bold text-white disabled:cursor-not-allowed disabled:opacity-45">{bkp.rawContent ? 'Restore' : 'Metadata only'}</button>
+              </div>
+            </article>
+          ))}
+          {backups.length === 0 && <p className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-xs text-slate-400 dark:border-slate-700">No snapshots have been created yet.</p>}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full text-left text-xs border-collapse">
             <thead className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 font-semibold uppercase tracking-wider">
               <tr>
@@ -259,14 +332,19 @@ export const BackupPage = () => {
                         setRestoreStatus(null);
                         setRestoreModalOpen(true);
                       }}
-                      className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold text-[11px] transition shadow-sm"
+                      disabled={!bkp.rawContent}
+                      title={bkp.rawContent ? 'Restore embedded JSON snapshot' : 'Metadata only; upload the original JSON file'}
+                      className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold text-[11px] transition shadow-sm disabled:cursor-not-allowed disabled:opacity-45"
                     >
-                      Restore Snapshot
+                      {bkp.rawContent ? 'Restore Snapshot' : 'Metadata Only'}
                     </button>
                   </td>
 
                 </tr>
               ))}
+              {backups.length === 0 && (
+                <tr><td colSpan="7" className="p-10 text-center text-xs text-slate-400">No snapshots have been created yet.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -278,10 +356,10 @@ export const BackupPage = () => {
           <div>
             <div className="flex items-center space-x-2 text-rose-800 dark:text-amber-400 text-xs font-bold uppercase tracking-wider">
               <Layers className="w-4 h-4" />
-              <span>Selective Individual Record Recovery</span>
+              <span>Individual Record Integrity Repair</span>
             </div>
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">Inspect & Selectively Restore Individual Academic Records</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Select any record stored in Firebase RTDB to inspect fields or restore its status</p>
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-0.5">Inspect, Re-approve & Resynchronize Academic Records</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Inspect the current live record and explicitly re-approve it when synchronization repair is required</p>
           </div>
 
           <div className="relative w-full sm:w-64">
@@ -335,7 +413,7 @@ export const BackupPage = () => {
           <div className="lg:col-span-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 p-4 space-y-4">
             {selectedRecordObj ? (
               <div className="space-y-4 text-xs">
-                <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-3">
+                <div className="flex flex-col gap-3 border-b border-slate-200 pb-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h4 className="font-bold text-sm text-slate-900 dark:text-white">{selectedRecordObj.subjectCode}: {selectedRecordObj.subjectTitle}</h4>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">{selectedRecordObj.department} ({selectedRecordObj.academicYear})</p>
@@ -343,10 +421,10 @@ export const BackupPage = () => {
                   <button
                     type="button"
                     onClick={handleSelectiveRecordRestore}
-                    className="px-3.5 py-2 bg-gradient-to-r from-rose-900 to-amber-700 hover:from-rose-800 hover:to-amber-600 text-amber-100 font-bold rounded-xl flex items-center space-x-1.5 shadow-sm transition"
+                    className="flex min-h-10 w-full items-center justify-center space-x-1.5 rounded-xl bg-gradient-to-r from-rose-900 to-amber-700 px-3.5 py-2 font-bold text-amber-100 shadow-sm transition hover:from-rose-800 hover:to-amber-600 sm:w-auto"
                   >
                     <RefreshCw className="w-3.5 h-3.5 text-amber-300" />
-                    <span>Selectively Restore Record</span>
+                    <span>Re-approve & Resync</span>
                   </button>
                 </div>
 
@@ -370,7 +448,7 @@ export const BackupPage = () => {
                 </div>
 
                 <div className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 space-y-1 font-mono text-[11px]">
-                  <div className="text-slate-400">// Record Firebase Payload Metadata</div>
+                  <div className="text-slate-400">// Current Firebase Payload Metadata</div>
                   <div className="text-slate-300">ID: <span className="text-amber-400">{selectedRecordObj.id}</span></div>
                   <div className="text-slate-300">Encoded By: {selectedRecordObj.encodedBy}</div>
                   <div className="text-slate-300">Status: {selectedRecordObj.status}</div>
@@ -380,7 +458,7 @@ export const BackupPage = () => {
             ) : (
               <div className="p-8 text-center text-slate-400 text-xs space-y-2">
                 <FileText className="w-8 h-8 mx-auto text-slate-500 opacity-60" />
-                <p>Select any academic record from the list on the left to inspect payload parameters or selectively restore its status.</p>
+                <p>Select a live academic record to inspect its payload. Re-approval updates the current record; it does not recover a historical version.</p>
               </div>
             )}
           </div>
@@ -389,10 +467,15 @@ export const BackupPage = () => {
       </div>
 
       {/* JSON Payload Preview Modal */}
-      {previewModalOpen && selectedBackup && (
-        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-          <div className="modal-surface w-full max-w-2xl space-y-4 rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+      <Modal
+        open={previewModalOpen && Boolean(selectedBackup)}
+        onClose={() => setPreviewModalOpen(false)}
+        ariaLabel="Backup snapshot payload preview"
+        className="w-full max-w-2xl space-y-4 rounded-3xl border border-slate-200 bg-white p-5 text-slate-900 shadow-2xl dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 sm:p-6"
+      >
+        {selectedBackup && (
+          <div>
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-slate-800">
               <div>
                 <h3 className="text-base font-bold text-slate-900 dark:text-white">
                   Snapshot Payload Preview: {selectedBackup.fileName}
@@ -412,7 +495,7 @@ export const BackupPage = () => {
               <pre>{selectedBackup.rawContent || JSON.stringify(selectedBackup, null, 2)}</pre>
             </div>
 
-            <div className="flex justify-end space-x-2 pt-2">
+            <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => setPreviewModalOpen(false)}
@@ -426,19 +509,26 @@ export const BackupPage = () => {
                   setPreviewModalOpen(false);
                   setRestoreModalOpen(true);
                 }}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-semibold text-xs"
+                disabled={!selectedBackup.rawContent}
+                title={selectedBackup.rawContent ? 'Restore this embedded snapshot' : 'Upload the original JSON file to restore'}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-xl font-semibold text-xs disabled:cursor-not-allowed disabled:opacity-45"
               >
-                Proceed to Restore
+                {selectedBackup.rawContent ? 'Proceed to Restore' : 'Metadata Only'}
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* Restore Modal */}
-      {restoreModalOpen && (
-        <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-          <div className="modal-surface w-full max-w-lg space-y-4 rounded-3xl border border-slate-200 bg-white p-6 text-slate-900 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 shadow-2xl">
+      <Modal
+        open={restoreModalOpen}
+        onClose={() => !isRestoring && setRestoreModalOpen(false)}
+        ariaLabel="System database restore"
+        closeOnBackdrop={!isRestoring}
+        zIndex={110}
+        className="w-full max-w-lg space-y-4 rounded-3xl border border-slate-200 bg-white p-5 text-slate-900 shadow-2xl dark:border-slate-800 dark:bg-slate-900 dark:text-slate-100 sm:p-6"
+      >
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
                 System Database Restore
@@ -446,6 +536,7 @@ export const BackupPage = () => {
               <button
                 type="button"
                 onClick={() => setRestoreModalOpen(false)}
+                disabled={isRestoring}
                 className="control-lift icon-control grid h-9 w-9 place-items-center rounded-xl text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold"
               >
                 ✕
@@ -486,7 +577,7 @@ export const BackupPage = () => {
                   <span>Warning: System Overwrite</span>
                 </div>
                 <p className="text-[11px]">
-                  Executing a restore operation will replace current active accounts and academic performance records with the snapshot dataset.
+                  A restore replaces only the supported collections present in the selected file: accounts, records/requests, departments, programs, subjects, and audit logs. Missing collections are left unchanged.
                 </p>
               </div>
 
@@ -494,6 +585,7 @@ export const BackupPage = () => {
                 <button
                   type="button"
                   onClick={() => setRestoreModalOpen(false)}
+                  disabled={isRestoring}
                   className="control-lift px-4 py-2 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-semibold"
                 >
                   Cancel
@@ -501,17 +593,23 @@ export const BackupPage = () => {
                 <button
                   type="button"
                   onClick={handleExecuteRestore}
+                  disabled={isRestoring}
                   className="primary-action button-shine px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold flex items-center space-x-1.5"
                 >
                   <RotateCcw className="w-3.5 h-3.5" />
-                  <span>Execute Data Restore</span>
+                  <span>{isRestoring ? 'Restoring…' : 'Execute Data Restore'}</span>
                 </button>
               </div>
 
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
+
+      <Toast
+        message={notice?.message}
+        type={notice?.type}
+        onClose={() => setNotice(null)}
+        duration={6000}
+      />
 
     </div>
   );

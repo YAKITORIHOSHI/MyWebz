@@ -9,9 +9,11 @@
     "build": "vite build",
     "deploy": "npm run build && firebase deploy",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "check": "npm run lint && npm run build"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.112.2",
     "@tailwindcss/vite": "^4.3.3",
     "firebase": "^12.17.1",
     "lucide-react": "^1.28.0",
@@ -26,6 +28,15 @@
     "@vitejs/plugin-basic-ssl": "^2.3.0",
     "@vitejs/plugin-react": "^6.0.4",
     "oxlint": "^1.75.0",
+    "playwright": "^1.62.1",
     "vite": "^8.2.0"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "allowScripts": {
+    "@firebase/util@1.15.2": true,
+    "@supabase/supabase-js": true,
+    "protobufjs@7.6.5": true
   }
 }

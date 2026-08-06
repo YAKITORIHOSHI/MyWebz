@@ -1,38 +1,44 @@
 @import "tailwindcss";
-@custom-variant dark (&:where(.dark, .dark *));
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+}
 
 :root {
   color-scheme: light;
+  --nci-bg-image: url('./assets/background.png');
+  --cct-bg-image: url('./assets/background.png');
   --elevation-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --cct-crimson: #8b1e3f;
-  --cct-crimson-dark: #6b1426;
-  --cct-gold: #d4af37;
-  --cct-gold-light: #f59e0b;
+  --nci-navy: #0f2b5c;
+  --nci-navy-dark: #0b1d3a;
+  --nci-cyan: #0284c7;
+  --nci-cyan-light: #38bdf8;
   --shadow-card:
     0 1px 2px rgba(15, 23, 42, 0.06),
-    0 8px 20px -14px rgba(139, 30, 63, 0.15),
+    0 8px 20px -14px rgba(2, 132, 199, 0.18),
     0 18px 40px -30px rgba(15, 23, 42, 0.2);
   --shadow-card-hover:
     0 2px 4px rgba(15, 23, 42, 0.08),
-    0 14px 28px -16px rgba(139, 30, 63, 0.24),
+    0 14px 28px -16px rgba(2, 132, 199, 0.28),
     0 26px 50px -34px rgba(15, 23, 42, 0.24);
   --shadow-control:
     0 1px 2px rgba(15, 23, 42, 0.08),
-    0 6px 14px -11px rgba(139, 30, 63, 0.18);
+    0 6px 14px -11px rgba(2, 132, 199, 0.2);
   --shadow-control-hover:
     0 2px 4px rgba(15, 23, 42, 0.1),
-    0 10px 20px -12px rgba(139, 30, 63, 0.26);
+    0 10px 20px -12px rgba(2, 132, 199, 0.3);
   --shadow-primary:
-    0 1px 2px rgba(107, 20, 38, 0.22),
-    0 10px 22px -12px rgba(139, 30, 63, 0.45);
+    0 1px 2px rgba(11, 29, 58, 0.25),
+    0 10px 22px -12px rgba(2, 132, 199, 0.5);
   --shadow-primary-hover:
-    0 2px 4px rgba(107, 20, 38, 0.24),
-    0 16px 28px -14px rgba(139, 30, 63, 0.55);
+    0 2px 4px rgba(11, 29, 58, 0.3),
+    0 16px 28px -14px rgba(2, 132, 199, 0.6);
   --shadow-overlay:
     0 22px 48px -20px rgba(15, 23, 42, 0.3),
     0 10px 22px -16px rgba(15, 23, 42, 0.16);
   --surface-highlight: #ffffff;
-  --surface-ring: rgba(139, 30, 63, 0.22);
+  --surface-ring: rgba(2, 132, 199, 0.25);
 }
 
 html.dark {
@@ -53,46 +59,106 @@ html.dark {
     0 11px 22px -13px rgba(0, 0, 0, 0.78);
   --shadow-primary:
     0 1px 2px rgba(0, 0, 0, 0.32),
-    0 11px 24px -12px rgba(139, 30, 63, 0.58);
+    0 11px 24px -12px rgba(2, 132, 199, 0.6);
   --shadow-primary-hover:
     0 2px 4px rgba(0, 0, 0, 0.38),
-    0 16px 30px -14px rgba(212, 175, 55, 0.45);
+    0 16px 30px -14px rgba(56, 189, 248, 0.5);
   --shadow-overlay:
     0 28px 64px -24px rgba(0, 0, 0, 0.84),
     0 12px 28px -19px rgba(0, 0, 0, 0.62);
   --surface-highlight: rgba(255, 255, 255, 0.055);
-  --surface-ring: rgba(212, 175, 55, 0.3);
+  --surface-ring: rgba(56, 189, 248, 0.3);
 }
 
 html {
   min-width: 320px;
   scroll-behavior: smooth;
-  background-color: #fcf8f9;
+  background-color: #f1f5f9;
 }
 
 html.dark {
-  background-color: #0f0508;
+  background-color: #0b1329;
+}
+
+body, input, select, textarea, button {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
 }
 
 body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
-  background:
-    radial-gradient(circle at 12% -8%, rgba(139, 30, 63, 0.1), transparent 28rem),
-    radial-gradient(circle at 96% 4%, rgba(212, 175, 55, 0.1), transparent 24rem),
-    #fcf8f9;
+  background-color: #f1f5f9;
+  background-image:
+    linear-gradient(rgba(241, 245, 249, 0.65), rgba(241, 245, 249, 0.82)),
+    radial-gradient(circle at 12% -8%, rgba(2, 132, 199, 0.16), transparent 28rem),
+    radial-gradient(circle at 96% 4%, rgba(56, 189, 248, 0.16), transparent 24rem),
+    var(--nci-bg-image);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  background-attachment: fixed;
   color: #0f172a;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Hardware acceleration toggle */
+html.no-hw-accel *,
+html.no-hw-accel *::before,
+html.no-hw-accel *::after {
+  will-change: auto !important;
+  transform: none !important;
+  backface-visibility: visible !important;
+}
+
+html.no-hw-accel .page-transition,
+html.no-hw-accel .nav-item,
+html.no-hw-accel .control-lift {
+  transform: none !important;
+}
+
+/* Reduce motion toggle */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Custom Typography Font Choice Overrides */
+html.font-montserrat,
+html.font-montserrat body,
+html.font-montserrat input,
+html.font-montserrat select,
+html.font-montserrat textarea,
+html.font-montserrat button {
+  font-family: 'Montserrat', ui-sans-serif, system-ui, -apple-system, sans-serif !important;
+}
+
+html.font-oswald,
+html.font-oswald body,
+html.font-oswald input,
+html.font-oswald select,
+html.font-oswald textarea,
+html.font-oswald button {
+  font-family: 'Oswald', ui-sans-serif, system-ui, -apple-system, sans-serif !important;
+}
+
 html.dark body {
-  background:
-    radial-gradient(circle at 12% -8%, rgba(139, 30, 63, 0.22), transparent 31rem),
-    radial-gradient(circle at 96% 2%, rgba(212, 175, 55, 0.14), transparent 28rem),
-    #0f0508;
+  background-color: #0b1329;
+  background-image:
+    linear-gradient(rgba(11, 19, 41, 0.76), rgba(11, 19, 41, 0.88)),
+    radial-gradient(circle at 12% -8%, rgba(15, 43, 92, 0.35), transparent 31rem),
+    radial-gradient(circle at 96% 2%, rgba(2, 132, 199, 0.2), transparent 28rem),
+    var(--nci-bg-image);
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: cover;
+  background-attachment: fixed;
   color: #f8fafc;
 }
 
@@ -581,12 +647,12 @@ textarea:focus-visible {
 }
 
 .page-transition {
-  animation: page-slide-in 420ms var(--elevation-ease) both;
+  animation: page-slide-in 420ms var(--elevation-ease) backwards;
   transform-origin: 50% 0;
 }
 
 .page-stack > * {
-  animation: section-rise-in 480ms var(--elevation-ease) both;
+  animation: section-rise-in 480ms var(--elevation-ease) backwards;
 }
 
 .page-stack > :nth-child(1) { animation-delay: 35ms; }
@@ -853,6 +919,13 @@ textarea:focus-visible {
     font-size: 16px;
   }
 
+  body,
+  html.dark body {
+    background-attachment: scroll;
+    background-position: center top;
+    background-size: cover;
+  }
+
   .surface-panel-hover:hover,
   .metric-tile:hover,
   .profile-panel:hover,
@@ -910,4 +983,140 @@ textarea:focus-visible {
 
 .app-shell {
   background-color: transparent !important;
+}
+
+
+/* Overlay and viewport hardening */
+body {
+  overflow-x: hidden;
+}
+
+.modal-backdrop {
+  overscroll-behavior: contain;
+  padding-top: max(0px, env(safe-area-inset-top));
+  padding-bottom: max(0px, env(safe-area-inset-bottom));
+}
+
+.mobile-drawer-backdrop {
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  padding: 0 !important;
+}
+
+.mobile-drawer {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  overscroll-behavior: contain;
+}
+
+.dropdown-surface {
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 639px) {
+  .modal-surface {
+    max-width: 100%;
+  }
+
+  .modal-backdrop {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+
+.modal-surface {
+  max-height: calc(100dvh - max(1.5rem, env(safe-area-inset-top)) - max(1.5rem, env(safe-area-inset-bottom)));
+}
+
+.mobile-sheet-backdrop {
+  padding-right: 0 !important;
+  padding-bottom: env(safe-area-inset-bottom) !important;
+  padding-left: 0 !important;
+}
+
+.modal-surface pre {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+@keyframes cct-spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  animation: cct-spin 1s linear infinite;
+}
+
+/* Persistent workspace pages are mounted eagerly and only the active page is painted. */
+.workspace-page-hidden {
+  display: none !important;
+}
+
+/* Desktop navigation remains fixed within the viewport and never becomes an inner scroll area. */
+.sidebar-shell {
+  overscroll-behavior: none;
+}
+
+.sidebar-content {
+  overflow: hidden;
+}
+
+@media (min-width: 1024px) and (max-height: 760px) {
+  .sidebar-content {
+    padding: 0.625rem;
+  }
+
+  .sidebar-profile {
+    padding: 0.625rem;
+  }
+
+  .sidebar-profile-detail {
+    display: none;
+  }
+
+  .sidebar-nav {
+    margin-top: 0.625rem;
+  }
+
+  .sidebar-nav .nav-item {
+    min-height: 2.5rem;
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
+  }
+
+  .sidebar-queue {
+    margin-top: 0.625rem;
+  }
+
+  .sidebar-footer {
+    padding-top: 0.625rem;
+  }
+}
+
+@media (min-width: 1024px) and (max-height: 650px) {
+  .sidebar-queue,
+  .sidebar-footer {
+    display: none;
+  }
+}
+
+@media (min-width: 1024px) and (max-height: 560px) {
+  .sidebar-profile,
+  .sidebar-queue,
+  .sidebar-footer {
+    display: none;
+  }
+
+  .sidebar-nav {
+    margin-top: 0;
+  }
+
+  .sidebar-nav .nav-item {
+    min-height: 2.25rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
 }

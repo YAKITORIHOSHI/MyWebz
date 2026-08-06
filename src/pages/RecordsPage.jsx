@@ -16,6 +16,10 @@ import {
   X,
   XCircle
 } from 'lucide-react';
+import { CustomSelect } from '../components/common/CustomSelect';
+import { ConfirmDialog, Toast } from '../components/common/Feedback';
+import { Modal } from '../components/common/Modal';
+import { SubjectCombobox } from '../components/common/SubjectCombobox';
 import {
   buildAcademicYearOptions,
   getCurrentAcademicYear,
@@ -52,6 +56,11 @@ const Metric = ({ label, value, emphasis = '' }) => (
   </div>
 );
 
+const numberFromField = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 export const RecordsPage = () => {
   const {
     currentUser,
@@ -61,6 +70,7 @@ export const RecordsPage = () => {
     reviewRecord,
     deleteRecord,
     departments,
+    programs,
     subjectCatalog,
     permissions,
     canEditRecord,
@@ -69,11 +79,13 @@ export const RecordsPage = () => {
   } = useAuth();
 
   const academicYears = useMemo(() => buildAcademicYearOptions(records), [records]);
-  const defaultDepartment = permissions.canViewAllDepartments ? departments[0] : currentUser.department;
+  const defaultDepartment = permissions.canViewAllDepartments ? departments[0] : (currentUser?.department || '');
   const defaultAcademicYear = getCurrentAcademicYear();
 
   const emptyForm = () => ({
     department: defaultDepartment,
+    programId: '',
+    programName: '',
     academicYear: defaultAcademicYear,
     semester: '1st Semester',
     subjectCode: '',
@@ -89,7 +101,8 @@ export const RecordsPage = () => {
   });
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [deptFilter, setDeptFilter] = useState(permissions.canViewAllDepartments ? 'ALL' : currentUser.department);
+  const [deptFilter, setDeptFilter] = useState(permissions.canViewAllDepartments ? 'ALL' : (currentUser?.department || ''));
+  const [programFilter, setProgramFilter] = useState('ALL');
   const [ayFilter, setAyFilter] = useState('ALL');
   const [semFilter, setSemFilter] = useState('ALL');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -99,17 +112,44 @@ export const RecordsPage = () => {
   const [formError, setFormError] = useState('');
   const [reviewState, setReviewState] = useState(null);
   const [reviewNote, setReviewNote] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [notice, setNotice] = useState(null);
+
+  const availablePrograms = useMemo(() => programs
+    .filter((program) => program.department === formData.department)
+    .sort((a, b) => `${a.code || ''} ${a.name}`.localeCompare(`${b.code || ''} ${b.name}`)),
+  [formData.department, programs]);
+
+  const availableSubjects = useMemo(() => {
+    const catalog = Array.isArray(subjectCatalog) ? subjectCatalog : [];
+    return catalog.filter((subject) => {
+      const isInstitutionWide = subject.department === 'All Academic Units' || subject.department === 'ALL';
+      if (!isInstitutionWide && subject.department !== formData.department) return false;
+      if (!subject.programId) return true;
+      return Boolean(formData.programId) && subject.programId === formData.programId;
+    });
+  }, [formData.department, formData.programId, subjectCatalog]);
+
+  const filterPrograms = useMemo(() => programs
+    .filter((program) => deptFilter === 'ALL' || program.department === deptFilter)
+    .sort((a, b) => `${a.department} ${a.code || ''} ${a.name}`.localeCompare(`${b.department} ${b.code || ''} ${b.name}`)),
+  [deptFilter, programs]);
 
   useEffect(() => {
-    setDeptFilter(permissions.canViewAllDepartments ? 'ALL' : currentUser.department);
+    if (programFilter === 'ALL' || programFilter === '__DEPARTMENT_WIDE__') return;
+    if (!filterPrograms.some((program) => program.id === programFilter)) setProgramFilter('ALL');
+  }, [filterPrograms, programFilter]);
+
+  useEffect(() => {
+    setDeptFilter(permissions.canViewAllDepartments ? 'ALL' : (currentUser?.department || ''));
     setIsModalOpen(false);
     setReviewState(null);
-  }, [currentUser.id, currentUser.department, permissions.canViewAllDepartments]);
+  }, [currentUser?.id, currentUser?.department, permissions.canViewAllDepartments]);
 
   const scopedRecords = useMemo(() => records.filter((record) => {
     if (permissions.canViewAllDepartments) return true;
-    return record.department === currentUser.department;
-  }), [records, currentUser.department, permissions.canViewAllDepartments]);
+    return record.department === currentUser?.department;
+  }), [records, currentUser?.department, permissions.canViewAllDepartments]);
 
   const filteredRecords = useMemo(() => scopedRecords.filter((record) => {
     const query = searchTerm.trim().toLowerCase();
@@ -118,25 +158,27 @@ export const RecordsPage = () => {
       record.subjectTitle,
       record.encodedBy,
       record.department,
+      record.programName,
       record.remarks
     ].some((value) => String(value || '').toLowerCase().includes(query));
 
     return matchesSearch
       && (deptFilter === 'ALL' || record.department === deptFilter)
+      && (programFilter === 'ALL' || (programFilter === '__DEPARTMENT_WIDE__' ? !record.programId : record.programId === programFilter))
       && (ayFilter === 'ALL' || record.academicYear === ayFilter)
       && (semFilter === 'ALL' || record.semester === semFilter)
       && (statusFilter === 'ALL' || record.status === statusFilter);
-  }), [scopedRecords, searchTerm, deptFilter, ayFilter, semFilter, statusFilter]);
+  }), [scopedRecords, searchTerm, deptFilter, programFilter, ayFilter, semFilter, statusFilter]);
 
   const pendingCount = scopedRecords.filter((record) => record.status === RECORD_STATUS.PENDING).length;
   const approvedCount = scopedRecords.filter((record) => record.status === RECORD_STATUS.APPROVED).length;
   const returnedCount = scopedRecords.filter((record) => record.status === RECORD_STATUS.RETURNED).length;
 
-  const liveEnrolled = Number.parseInt(formData.enrolledCount, 10) || 0;
-  const livePassed = Number.parseInt(formData.passedCount, 10) || 0;
-  const liveFailed = Number.parseInt(formData.failedCount, 10) || 0;
-  const liveDropped = Number.parseInt(formData.droppedCount, 10) || 0;
-  const liveInc = Number.parseInt(formData.incCount, 10) || 0;
+  const liveEnrolled = numberFromField(formData.enrolledCount);
+  const livePassed = numberFromField(formData.passedCount);
+  const liveFailed = numberFromField(formData.failedCount);
+  const liveDropped = numberFromField(formData.droppedCount);
+  const liveInc = numberFromField(formData.incCount);
   const classifiedTotal = livePassed + liveFailed + liveDropped + liveInc;
   const livePassingRate = liveEnrolled > 0 ? ((livePassed / liveEnrolled) * 100).toFixed(2) : '0.00';
 
@@ -151,6 +193,8 @@ export const RecordsPage = () => {
     setEditingRecord(record);
     setFormData({
       department: record.department,
+      programId: record.programId || '',
+      programName: record.programName || '',
       academicYear: record.academicYear,
       semester: record.semester,
       subjectCode: record.subjectCode,
@@ -172,34 +216,94 @@ export const RecordsPage = () => {
     event.preventDefault();
     setFormError('');
 
+    if (!formData.department || !formData.academicYear || !formData.semester) {
+      setFormError('Academic unit, academic year, and semester are required.');
+      return;
+    }
     if (!formData.subjectCode.trim() || !formData.subjectTitle.trim()) {
       setFormError('Subject code and title are required.');
+      return;
+    }
+    const outcomeCounts = [liveEnrolled, livePassed, liveFailed, liveDropped, liveInc];
+    if (outcomeCounts.some((count) => !Number.isInteger(count))) {
+      setFormError('Student counts must be whole numbers.');
       return;
     }
     if (liveEnrolled <= 0) {
       setFormError('Enrolled students must be greater than zero.');
       return;
     }
+    if ([livePassed, liveFailed, liveDropped, liveInc].some((count) => count < 0)) {
+      setFormError('Student outcome counts cannot be negative.');
+      return;
+    }
     if (classifiedTotal > liveEnrolled) {
       setFormError(`Student outcomes total ${classifiedTotal}, which exceeds enrolled students (${liveEnrolled}).`);
       return;
     }
+    const averageGrade = Number.parseFloat(formData.averageGrade);
+    if (!Number.isFinite(averageGrade) || averageGrade < 1 || averageGrade > 5) {
+      setFormError('Average grade must be between 1.00 and 5.00.');
+      return;
+    }
+    const normalizedCode = formData.subjectCode.trim().toUpperCase().replace(/\s+/g, ' ');
+    const duplicate = records.find((record) => record.id !== editingRecord?.id
+      && record.department === formData.department
+      && String(record.programId || record.programName || '') === String(formData.programId || formData.programName || '')
+      && record.academicYear === formData.academicYear
+      && record.semester === formData.semester
+      && String(record.subjectCode || '').trim().toUpperCase().replace(/\s+/g, ' ') === normalizedCode);
+    if (duplicate) {
+      setFormError(`A ${formData.subjectCode} record already exists for this program, year, and semester.`);
+      return;
+    }
 
+    const payload = {
+      ...formData,
+      subjectCode: normalizedCode,
+      subjectTitle: formData.subjectTitle.trim(),
+      programId: formData.programId || '',
+      programName: formData.programName || '',
+      enrolledCount: liveEnrolled,
+      passedCount: livePassed,
+      failedCount: liveFailed,
+      droppedCount: liveDropped,
+      incCount: liveInc,
+      averageGrade,
+      remarks: formData.remarks.trim()
+    };
     const result = editingRecord
-      ? updateRecord(editingRecord.id, formData)
-      : addRecord(formData);
+      ? updateRecord(editingRecord.id, payload)
+      : addRecord(payload);
 
     if (!result?.success) {
       setFormError(result?.message || 'The record could not be saved.');
       return;
     }
     setIsModalOpen(false);
+    setNotice({
+      type: 'success',
+      message: editingRecord
+        ? `${normalizedCode} was updated successfully.`
+        : permissions.isHead
+          ? `${normalizedCode} was submitted for dean approval.`
+          : `${normalizedCode} was saved as an approved record.`
+    });
   };
 
   const handleDelete = (record) => {
-    if (!window.confirm(`Delete ${record.subjectCode} from the academic records?`)) return;
-    const result = deleteRecord(record.id);
-    if (!result?.success) window.alert(result?.message || 'Unable to delete the record.');
+    setDeleteTarget(record);
+  };
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return;
+    const result = deleteRecord(deleteTarget.id);
+    if (!result?.success) {
+      setNotice({ type: 'error', message: result?.message || 'Unable to delete the record.' });
+      return;
+    }
+    setNotice({ type: 'success', message: `${deleteTarget.subjectCode} was deleted.` });
+    setDeleteTarget(null);
   };
 
   const openReviewModal = (record, decision) => {
@@ -212,9 +316,15 @@ export const RecordsPage = () => {
     if (reviewState.decision === 'return' && !reviewNote.trim()) return;
     const result = reviewRecord(reviewState.record.id, reviewState.decision, reviewNote);
     if (!result?.success) {
-      window.alert(result?.message || 'Unable to complete the review.');
+      setNotice({ type: 'error', message: result?.message || 'Unable to complete the review.' });
       return;
     }
+    setNotice({
+      type: 'success',
+      message: reviewState.decision === 'approve'
+        ? `${reviewState.record.subjectCode} was approved.`
+        : `${reviewState.record.subjectCode} was returned for revision.`
+    });
     setReviewState(null);
   };
 
@@ -284,42 +394,37 @@ export const RecordsPage = () => {
 
   return (
     <div className="page-stack space-y-4 sm:space-y-5">
-      <section className="surface-panel overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-        <div className="flex flex-col gap-4 p-4 sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+      <section className="hero-panel hero-motion relative overflow-hidden rounded-3xl border border-sky-500/30 bg-gradient-to-br from-slate-950 via-blue-950 to-sky-950 p-5 text-white sm:p-6 lg:p-7 shadow-xl shadow-sky-950/40">
+        <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-sky-500/25 blur-3xl" />
+        <div className="absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-blue-600/20 blur-3xl" />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
-            <div className="mb-1 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">
+            <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-sky-400">
               <FileSpreadsheet className="h-4 w-4" />
-              Academic records
+              Academic records management
             </div>
-            <h1 className="text-xl font-black tracking-tight text-slate-950 dark:text-white sm:text-2xl">Encoding and Approval Workspace</h1>
-            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-500 dark:text-slate-400">{roleMessage}</p>
+            <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Encoding & Approval Workspace</h1>
+            <p className="mt-2 max-w-3xl text-xs leading-relaxed text-sky-100/90 sm:text-sm">{roleMessage}</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-blue-900/40 px-3 py-1.5 text-[10px] font-bold text-sky-200">
+                <ShieldCheck className="h-3.5 w-3.5 text-sky-400" /> {currentUser?.role}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-blue-900/40 px-3 py-1.5 text-[10px] font-bold text-sky-200">
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Visible records: {scopedRecords.length}
+              </span>
+            </div>
           </div>
 
           {permissions.canCreateRecords && (
             <button
               type="button"
               onClick={openAddModal}
-              className="primary-action button-shine inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-indigo-700 sm:w-auto"
+              className="hero-action button-shine inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-400 to-blue-500 hover:from-sky-300 hover:to-blue-400 px-4 text-xs font-black text-slate-950 transition shadow-lg shadow-sky-500/25 cursor-pointer"
             >
               <PlusCircle className="h-4 w-4" />
               {permissions.isHead ? 'Encode and Submit' : 'Add Academic Record'}
             </button>
           )}
-        </div>
-
-        <div className="grid border-t border-slate-100 bg-slate-50/80 dark:border-slate-800 dark:bg-slate-950/40 sm:grid-cols-3">
-          <div className="flex items-start gap-3 border-b border-slate-200 p-3.5 dark:border-slate-800 sm:border-b-0 sm:border-r">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">1</span>
-            <div><p className="text-[11px] font-bold text-slate-800 dark:text-slate-200">Encode</p><p className="text-[10px] text-slate-500">Heads enter validated figures.</p></div>
-          </div>
-          <div className="flex items-start gap-3 border-b border-slate-200 p-3.5 dark:border-slate-800 sm:border-b-0 sm:border-r">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">2</span>
-            <div><p className="text-[11px] font-bold text-slate-800 dark:text-slate-200">Dean review</p><p className="text-[10px] text-slate-500">Approve or return with notes.</p></div>
-          </div>
-          <div className="flex items-start gap-3 p-3.5">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">3</span>
-            <div><p className="text-[11px] font-bold text-slate-800 dark:text-slate-200">Official reporting</p><p className="text-[10px] text-slate-500">Only approved data enters reports.</p></div>
-          </div>
         </div>
       </section>
 
@@ -330,17 +435,17 @@ export const RecordsPage = () => {
         <Metric label="Returned" value={returnedCount} emphasis="text-rose-600 dark:text-rose-400" />
       </section>
 
-      <section className="surface-panel surface-panel-hover rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 sm:p-4">
+      <section className="surface-panel surface-panel-hover relative z-30 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 sm:p-4">
         <div className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
           <Filter className="h-4 w-4 text-indigo-500" />
           Search and filters
         </div>
-        <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-[minmax(16rem,1.5fr)_repeat(4,minmax(9rem,1fr))]">
+        <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-[minmax(16rem,1.5fr)_repeat(5,minmax(8.5rem,1fr))]">
           <label className="relative sm:col-span-2 xl:col-span-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               type="search"
-              placeholder="Search subject, encoder, unit, or remarks"
+              placeholder="Search subject, program, encoder, unit, or remarks"
               value={searchTerm}
               onChange={(event) => setSearchTerm(event.target.value)}
               className="form-control pl-9"
@@ -348,26 +453,59 @@ export const RecordsPage = () => {
           </label>
 
           {permissions.canViewAllDepartments && (
-            <select value={deptFilter} onChange={(event) => setDeptFilter(event.target.value)} className="form-control">
-              <option value="ALL">All academic units</option>
-              {departments.map((department) => <option key={department} value={department}>{department}</option>)}
-            </select>
+            <CustomSelect
+              value={deptFilter}
+              onChange={(value) => {
+                setDeptFilter(value);
+                setProgramFilter('ALL');
+              }}
+              options={[
+                { value: 'ALL', label: 'All academic units' },
+                ...departments.map((department) => ({ value: department, label: department }))
+              ]}
+            />
           )}
 
-          <select value={ayFilter} onChange={(event) => setAyFilter(event.target.value)} className="form-control">
-            <option value="ALL">All academic years</option>
-            {academicYears.map((year) => <option key={year} value={year}>{year}</option>)}
-          </select>
+          <CustomSelect
+            value={programFilter}
+            onChange={setProgramFilter}
+            options={[
+              { value: 'ALL', label: 'All programs' },
+              { value: '__DEPARTMENT_WIDE__', label: 'Department-wide' },
+              ...filterPrograms.map((program) => ({
+                value: program.id,
+                label: `${program.code ? `${program.code} — ` : ''}${program.name}`
+              }))
+            ]}
+            ariaLabel="Program filter"
+          />
 
-          <select value={semFilter} onChange={(event) => setSemFilter(event.target.value)} className="form-control">
-            <option value="ALL">All semesters</option>
-            {SEMESTER_OPTIONS.map((semester) => <option key={semester} value={semester}>{semester}</option>)}
-          </select>
+          <CustomSelect
+            value={ayFilter}
+            onChange={setAyFilter}
+            options={[
+              { value: 'ALL', label: 'All academic years' },
+              ...academicYears.map((year) => ({ value: year, label: year }))
+            ]}
+          />
 
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} className="form-control">
-            <option value="ALL">All statuses</option>
-            {Object.values(RECORD_STATUS).map((status) => <option key={status} value={status}>{status}</option>)}
-          </select>
+          <CustomSelect
+            value={semFilter}
+            onChange={setSemFilter}
+            options={[
+              { value: 'ALL', label: 'All semesters' },
+              ...SEMESTER_OPTIONS.map((semester) => ({ value: semester, label: semester }))
+            ]}
+          />
+
+          <CustomSelect
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={[
+              { value: 'ALL', label: 'All statuses' },
+              ...Object.values(RECORD_STATUS).map((status) => ({ value: status, label: status }))
+            ]}
+          />
         </div>
         <div className="mt-3 text-[10px] font-medium text-slate-400">Showing {filteredRecords.length} of {scopedRecords.length} records</div>
       </section>
@@ -394,7 +532,7 @@ export const RecordsPage = () => {
                     <div className="font-mono text-xs font-black text-indigo-700 dark:text-indigo-300">{record.subjectCode}</div>
                     <div className="mt-1 max-w-[15rem] font-bold text-slate-900 dark:text-white">{record.subjectTitle}</div>
                   </td>
-                  <td className="max-w-[15rem] px-4 py-4 text-[11px] font-medium leading-relaxed text-slate-600 dark:text-slate-300">{record.department}</td>
+                  <td className="max-w-[15rem] px-4 py-4 text-[11px] font-medium leading-relaxed text-slate-600 dark:text-slate-300"><div>{record.department}</div><div className="mt-1 text-[10px] font-bold text-sky-600 dark:text-sky-300">{record.programName || 'Department-wide'}</div></td>
                   <td className="px-4 py-4">
                     <div className="font-bold text-slate-800 dark:text-slate-200">{record.academicYear}</div>
                     <div className="mt-1 text-[10px] text-slate-400">{record.semester}</div>
@@ -444,6 +582,7 @@ export const RecordsPage = () => {
 
             <div className="mt-3 rounded-xl bg-slate-50 p-3 dark:bg-slate-800/60">
               <p className="text-[10px] font-bold leading-relaxed text-slate-600 dark:text-slate-300">{record.department}</p>
+              <p className="mt-1 text-[10px] font-semibold text-sky-600 dark:text-sky-300">{record.programName || 'Department-wide'}</p>
               <p className="mt-1 text-[10px] text-slate-400">{record.academicYear} · {record.semester}</p>
             </div>
 
@@ -472,9 +611,14 @@ export const RecordsPage = () => {
         )}
       </section>
 
-      {isModalOpen && (
-        <div className="modal-backdrop fixed inset-0 z-[60] flex items-end justify-center bg-slate-950/70 p-0 backdrop-blur-sm sm:items-center sm:p-4">
-          <div className="modal-surface flex max-h-[94svh] w-full max-w-4xl flex-col overflow-hidden rounded-t-3xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 sm:rounded-3xl">
+      <Modal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        align="bottom"
+        backdropClassName="mobile-sheet-backdrop"
+        ariaLabel={editingRecord ? 'Edit academic performance record' : 'New academic performance record'}
+        className="flex max-h-[calc(100dvh-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-full max-w-4xl flex-col overflow-hidden rounded-t-3xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900 sm:max-h-[94dvh] sm:rounded-3xl"
+      >
             <div className="flex items-start justify-between gap-4 border-b border-slate-100 p-4 dark:border-slate-800 sm:p-5">
               <div>
                 <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-indigo-600 dark:text-indigo-400">
@@ -492,96 +636,117 @@ export const RecordsPage = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="flex min-h-0 flex-1 flex-col">
-              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4 sm:p-5">
+              <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain p-4 sm:p-5">
                 {formError && (
-                  <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                  <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700 dark:border-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
                     <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />{formError}
                   </div>
                 )}
 
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <label className="sm:col-span-2">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-6">
+                  <div className="sm:col-span-2">
                     <span className="form-label">Academic unit</span>
-                    <select
+                    <CustomSelect
                       value={formData.department}
                       disabled={!permissions.canViewAllDepartments}
-                      onChange={(event) => setFormData({ ...formData, department: event.target.value })}
-                      className="form-control disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                      {departments.map((department) => <option key={department} value={department}>{department}</option>)}
-                    </select>
-                  </label>
-
-                  <label>
-                    <span className="form-label">Academic year</span>
-                    <input
-                      type="text"
-                      list="academic-year-options"
-                      required
-                      value={formData.academicYear}
-                      onChange={(event) => setFormData({ ...formData, academicYear: event.target.value })}
-                      placeholder="AY 2026-2027"
-                      className="form-control"
+                      onChange={(val) => setFormData((previous) => ({
+                        ...previous,
+                        department: val,
+                        programId: '',
+                        programName: '',
+                        subjectCode: '',
+                        subjectTitle: ''
+                      }))}
+                      options={departments.map((d) => ({ value: d, label: d }))}
+                      ariaLabel="Academic unit"
                     />
-                    <datalist id="academic-year-options">
-                      {academicYears.map((year) => <option key={year} value={year} />)}
-                    </datalist>
-                  </label>
+                  </div>
 
-                  <label>
-                    <span className="form-label">Semester</span>
-                    <select value={formData.semester} onChange={(event) => setFormData({ ...formData, semester: event.target.value })} className="form-control">
-                      {SEMESTER_OPTIONS.map((semester) => <option key={semester} value={semester}>{semester}</option>)}
-                    </select>
-                  </label>
-
-                  <label>
-                    <span className="form-label">Subject code</span>
-                    <input
-                      type="text"
-                      list="subject-catalog-options"
-                      required
-                      value={formData.subjectCode}
-                      onChange={(event) => {
-                        const code = event.target.value.toUpperCase();
-                        const matched = subjectCatalog?.find((s) => s.code.toUpperCase() === code);
-                        setFormData((prev) => ({
-                          ...prev,
-                          subjectCode: code,
-                          subjectTitle: matched ? matched.title : prev.subjectTitle
+                  <div className="sm:col-span-2">
+                    <span className="form-label">Program / curriculum scope</span>
+                    <CustomSelect
+                      value={formData.programId || '__DEPARTMENT_WIDE__'}
+                      onChange={(value) => {
+                        const selectedProgram = availablePrograms.find((program) => program.id === value);
+                        setFormData((previous) => ({
+                          ...previous,
+                          programId: value === '__DEPARTMENT_WIDE__' ? '' : value,
+                          programName: selectedProgram?.name || '',
+                          subjectCode: '',
+                          subjectTitle: ''
                         }));
                       }}
-                      placeholder="CC 101"
-                      className="form-control font-mono uppercase"
+                      options={[
+                        { value: '__DEPARTMENT_WIDE__', label: 'Department-wide / common subjects' },
+                        ...availablePrograms.map((program) => ({ value: program.id, label: `${program.code ? `${program.code} — ` : ''}${program.name}` }))
+                      ]}
+                      ariaLabel="Academic program"
                     />
-                    <datalist id="subject-catalog-options">
-                      {subjectCatalog?.map((subj) => (
-                        <option key={subj.id || subj.code} value={subj.code}>
-                          {subj.code} - {subj.title} ({subj.department})
-                        </option>
-                      ))}
-                    </datalist>
+                  </div>
+
+                  <div>
+                    <span className="form-label">Academic year</span>
+                    <CustomSelect
+                      value={formData.academicYear}
+                      onChange={(val) => setFormData({ ...formData, academicYear: val })}
+                      options={academicYears.map((year) => ({ value: year, label: year }))}
+                      ariaLabel="Academic year"
+                    />
+                  </div>
+
+                  <div>
+                    <span className="form-label">Semester</span>
+                    <CustomSelect
+                      value={formData.semester}
+                      onChange={(val) => setFormData({ ...formData, semester: val })}
+                      options={SEMESTER_OPTIONS.map((s) => ({ value: s, label: s }))}
+                      ariaLabel="Semester"
+                    />
+                  </div>
+
+                  <label className="sm:col-span-2">
+                    <span className="form-label">Subject code</span>
+                    <SubjectCombobox
+                      value={formData.subjectCode}
+                      subjects={availableSubjects}
+                      onInputChange={(code) => {
+                        const matched = availableSubjects.find((subject) => subject.code.toUpperCase() === code.trim().toUpperCase());
+                        setFormData((previous) => ({
+                          ...previous,
+                          subjectCode: code,
+                          subjectTitle: matched ? matched.title : previous.subjectTitle
+                        }));
+                      }}
+                      onSelect={(subject) => setFormData((previous) => ({
+                        ...previous,
+                        subjectCode: subject.code,
+                        subjectTitle: subject.title
+                      }))}
+                    />
                   </label>
 
-                  <label className="sm:col-span-2 lg:col-span-3">
+                  <label className="sm:col-span-2 lg:col-span-4">
                     <span className="form-label">Subject title</span>
                     <input
                       type="text"
                       required
                       value={formData.subjectTitle}
                       onChange={(event) => setFormData({ ...formData, subjectTitle: event.target.value })}
-                      placeholder="Introduction to Computing"
+                      placeholder="Enter subject title"
                       className="form-control"
                     />
                   </label>
 
                   {permissions.isVPAA && editingRecord && (
-                    <label>
+                    <div>
                       <span className="form-label">Workflow status</span>
-                      <select value={formData.status} onChange={(event) => setFormData({ ...formData, status: event.target.value })} className="form-control">
-                        {Object.values(RECORD_STATUS).map((status) => <option key={status} value={status}>{status}</option>)}
-                      </select>
-                    </label>
+                      <CustomSelect
+                        value={formData.status}
+                        onChange={(val) => setFormData({ ...formData, status: val })}
+                        options={Object.values(RECORD_STATUS).map((s) => ({ value: s, label: s }))}
+                        ariaLabel="Workflow status"
+                      />
+                    </div>
                   )}
                 </div>
 
@@ -642,13 +807,17 @@ export const RecordsPage = () => {
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
+      </Modal>
 
-      {reviewState && (
-        <div className="modal-backdrop fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm">
-          <div className="modal-surface w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+      <Modal
+        open={Boolean(reviewState)}
+        onClose={() => setReviewState(null)}
+        ariaLabel="Review academic record"
+        zIndex={110}
+        className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900 sm:p-6"
+      >
+        {reviewState && (
+          <div>
             <div className="flex items-start justify-between gap-4">
               <div>
                 <div className={`flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] ${reviewState.decision === 'approve' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
@@ -691,8 +860,25 @@ export const RecordsPage = () => {
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
+
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete academic record?"
+        message={deleteTarget
+          ? `${deleteTarget.subjectCode} — ${deleteTarget.subjectTitle}\n\nThis permanently removes the record and its audit-visible workflow data.`
+          : ''}
+        confirmLabel="Delete record"
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+
+      <Toast
+        message={notice?.message}
+        type={notice?.type}
+        onClose={() => setNotice(null)}
+      />
     </div>
   );
 };

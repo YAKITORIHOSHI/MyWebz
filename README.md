@@ -1,62 +1,79 @@
 # CCT Academic Records Dashboard
 
-A responsive React/Vite dashboard for encoding, reviewing, approving, reporting, and backing up City College of Tagaytay academic records.
+A responsive React/Vite application for institutional academic records, approvals, reporting, catalog administration, and Firebase backup/recovery.
 
-## Improvements in this version
+## Current architecture
 
-- Dynamic academic-year entry and filtering instead of a fixed two-year list
-- Mobile, tablet, and desktop layouts for the dashboard, records, reports, accounts, navigation, and dialogs
-- Formal record workflow: **Head submission -> Dean review -> approved reporting**
-- Dean review actions for records within the dean's assigned department
-- VPAA full administrative authority across records, approvals, accounts, backups, and system reset
-- President read-only institutional oversight
-- Reports and official dashboard metrics use approved records only
-- Returned-for-revision notes, audit logging, passing-rate calculations, and outcome validation
-- Legacy Realtime Database records are normalized into the current academic-year/status model
-- Unified elevation system for cards, controls, menus, notices, tables, charts, and dialogs
-- Page slide-ins, staggered section reveals, animated drawers/dropdowns/modals, and subtle ambient motion
-- Pointer-aware hover lift effects that remain stable on touch devices
-- Reduced-motion support for users who disable interface animation at the operating-system level
+The workspace follows a component-first data flow:
+
+1. All authorized workspace pages are imported and mounted during the initial authenticated render.
+2. Cached collections render immediately when available.
+3. Firebase Realtime Database subscriptions start during an idle/background task after the interface is mounted.
+4. Large catalog and record snapshots are normalized in a Web Worker before React state is updated.
+5. Catalog and record mutations update the interface optimistically, then synchronize to Firebase while the sidebar and Settings page expose synchronization status.
+
+Authentication and authorization checks still complete before protected workspace content is shown.
+
+## Database-driven academic hierarchy
+
+The Institutional Subject Catalog no longer derives programs or courses from source-code constants. Its hierarchy is:
+
+```text
+Academic unit / school
+└── Program
+    └── Subject
+```
+
+Firebase collections:
+
+- `departments`: academic units or schools
+- `programs`: program records linked by their `department` value
+- `subjects`: subject records linked by `department` and optional `programId`
+- `requests`: academic performance records linked to the same department/program scope
+
+The VPAA can add or remove academic units, programs, and subjects from **System Settings**. Department-wide/common subjects use an empty `programId`. Existing subjects in the supplied database migration remain department-wide until assigned through the catalog workflow.
+
+See [DATABASE_SCHEMA_V6.md](DATABASE_SCHEMA_V6.md) for the field model and migration notes.
+
+## Interface changes
+
+- Non-scrolling compact desktop sidebar with viewport-height adaptations
+- Mobile navigation drawer with safe-area and touch support
+- Program filters and program labels in records, reports, CSV export, and the subject combobox
+- Portal-based responsive dropdowns and modal-safe menus
+- Responsive record table/cards and mobile bottom-sheet forms
+- Restored school logo for the browser tab/favicon
+- Database synchronization and pending-write status indicators
 
 ## Role matrix
 
-| Role | Records | Approval | Accounts | Backups | Reports |
-| --- | --- | --- | --- | --- | --- |
-| VPAA | Create, edit, delete all | Approve/return all | Full control | Full control | All departments |
-| President | Read-only | None | None | None | All departments |
-| Deans | Create/edit assigned department | Approve/return assigned department | None | None | Assigned department |
-| Heads | Create and revise own department records | Submit to dean | None | None | Assigned department |
-
-## Demo workflow
-
-1. Switch to a **Heads** account and encode a record. It enters `Pending Dean Approval`.
-2. Switch to the matching **Deans** account and approve it or return it with a review note.
-3. Approved records become available in official reports and approved-only dashboard KPIs.
-4. Switch to **VPAA** to edit any record, administer accounts, or manage backups.
-
-The seed data includes `head_informatics@gmail.com` and a pending Informatics record for review.
+| Role | Records | Approval | Catalog | Accounts | Backups | Reports |
+| --- | --- | --- | --- | --- | --- | --- |
+| VPAA | Create, edit, delete all | Approve/return all | Full control | Full control | Full control | All units |
+| President | Read-only | None | Read-only | None | None | All units |
+| Deans | Assigned unit | Approve/return assigned unit | Read-only | None | None | Assigned unit |
+| Heads | Create/revise assigned unit | Submit to dean | Read-only | None | None | Assigned unit |
 
 ## Local development
 
-Use a fresh dependency installation for the operating system where the project will run:
+Use an operating-system-native dependency installation. Do not reuse `node_modules` copied from another operating system.
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
-Production build:
+Production verification:
 
 ```bash
-npm run build
+npm run check
+npm run preview
 ```
 
-The application can run with local demo data. Add the Vite Firebase environment variables used by `src/firebase/config.js` to enable Firebase Authentication and Realtime Database synchronization.
+Deployment:
 
+```bash
+npm run deploy
+```
 
-## Contrast and elevation correction
-
-- Tailwind dark-mode utilities now follow the application theme toggle instead of the operating-system preference.
-- Cards, tables, filters, dropdowns, and header controls use opaque surfaces.
-- Lift is created with neutral shadows and a restrained 2px hover translation.
-- Decorative sheen was removed from container panels to preserve text contrast.
+Copy `.env.example` to `.env.local` and confirm the Firebase values before running the application. The source package intentionally excludes `.env.local`, build output, and `node_modules`.

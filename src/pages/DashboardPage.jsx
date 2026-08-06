@@ -26,12 +26,17 @@ import {
 } from 'recharts';
 import { RECORD_STATUS } from '../utils/academic';
 
-const COLORS = ['#8b1e3f', '#d4af37', '#991b1b', '#f59e0b', '#047857', '#ca8a04'];
+const COLORS = ['#0284c7', '#38bdf8', '#0f2b5c', '#14b8a6', '#6366f1', '#0369a1'];
 
-const shortDepartmentName = (department) => department
-  .replace('School of ', '')
-  .replace('Research & Development Office (RDO)', 'RDO')
-  .replace(' (Informatics)', '');
+const shortDepartmentName = (department) => {
+  const name = typeof department === 'string'
+    ? department
+    : (department?.name || department?.id || String(department || ''));
+  return name
+    .replace(/^School of\s+/i, '')
+    .replace(/^Office of\s+/i, '')
+    .trim();
+};
 
 export const DashboardPage = ({ setActiveTab, isDarkMode }) => {
   const { currentUser, records, accounts, departments, permissions } = useAuth();
@@ -80,8 +85,8 @@ export const DashboardPage = ({ setActiveTab, isDarkMode }) => {
     : permissions.isPresident
       ? 'Executive oversight of approved institutional performance. Data changes are restricted.'
       : permissions.isDean
-        ? `Review, edit, and approve academic records for ${currentUser.department}.`
-        : `Encode and submit performance records for ${currentUser.department}.`;
+        ? `Review, edit, and approve academic records for ${currentUser?.department || 'your department'}.`
+        : `Encode and submit performance records for ${currentUser?.department || 'your department'}.`;
 
   const primaryAction = permissions.isPresident
     ? { label: 'Open Reports', tab: 'reports' }
@@ -91,22 +96,22 @@ export const DashboardPage = ({ setActiveTab, isDarkMode }) => {
 
   return (
     <div className="page-stack space-y-4 sm:space-y-5">
-      <section className="hero-panel hero-motion relative overflow-hidden rounded-3xl border border-amber-500/30 bg-gradient-to-br from-slate-950 via-rose-950 to-amber-950 p-5 text-white sm:p-6 lg:p-7 shadow-xl shadow-rose-950/30">
-        <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-rose-600/25 blur-3xl" />
-        <div className="absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-amber-500/20 blur-3xl" />
+      <section className="hero-panel hero-motion relative overflow-hidden rounded-3xl border border-sky-500/30 bg-gradient-to-br from-slate-950 via-blue-950 to-sky-950 p-5 text-white sm:p-6 lg:p-7 shadow-xl shadow-sky-950/40">
+        <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-sky-500/25 blur-3xl" />
+        <div className="absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-blue-600/20 blur-3xl" />
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0">
-            <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-amber-400">
+            <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-sky-400">
               <Building2 className="h-4 w-4" />
               Academic affairs command center
             </div>
             <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Welcome, {currentUser?.name}</h1>
-            <p className="mt-2 max-w-3xl text-xs leading-relaxed text-amber-100/90 sm:text-sm">{roleDescription}</p>
+            <p className="mt-2 max-w-3xl text-xs leading-relaxed text-sky-100/90 sm:text-sm">{roleDescription}</p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-rose-900/40 px-3 py-1.5 text-[10px] font-bold text-amber-200">
-                <ShieldCheck className="h-3.5 w-3.5 text-amber-400" /> {currentUser?.role}
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-blue-900/40 px-3 py-1.5 text-[10px] font-bold text-sky-200">
+                <ShieldCheck className="h-3.5 w-3.5 text-sky-400" /> {currentUser?.role}
               </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/30 bg-rose-900/40 px-3 py-1.5 text-[10px] font-bold text-amber-200">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-blue-900/40 px-3 py-1.5 text-[10px] font-bold text-sky-200">
                 <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Reporting cycle: {activeAcademicYear}
               </span>
             </div>
@@ -116,7 +121,7 @@ export const DashboardPage = ({ setActiveTab, isDarkMode }) => {
             <button
               type="button"
               onClick={() => setActiveTab(primaryAction.tab)}
-              className="hero-action button-shine inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 px-4 text-xs font-black text-rose-950 transition shadow-lg shadow-amber-500/20"
+              className="hero-action button-shine inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-400 to-blue-500 hover:from-sky-300 hover:to-blue-400 px-4 text-xs font-black text-slate-950 transition shadow-lg shadow-sky-500/25 cursor-pointer"
             >
               {primaryAction.label}<ArrowRight className="h-4 w-4" />
             </button>
@@ -124,7 +129,7 @@ export const DashboardPage = ({ setActiveTab, isDarkMode }) => {
               <button
                 type="button"
                 onClick={() => setActiveTab('reports')}
-                className="glass-control control-lift min-h-11 rounded-xl border border-amber-500/30 bg-rose-900/40 px-4 text-xs font-bold text-amber-200 transition hover:bg-rose-900/60"
+                className="glass-control control-lift min-h-11 rounded-xl border border-sky-400/30 bg-blue-950/40 px-4 text-xs font-bold text-sky-200 transition hover:bg-blue-900/60 cursor-pointer"
               >
                 View Reports
               </button>
@@ -170,14 +175,14 @@ export const DashboardPage = ({ setActiveTab, isDarkMode }) => {
             <button
               type="button"
               onClick={() => setActiveTab('records')}
-              className="notice-card flex items-center gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left text-amber-700 transition hover:border-amber-300 dark:border-amber-900/70 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:border-amber-800"
+              className="notice-card flex items-center gap-4 rounded-2xl border border-sky-200 bg-sky-50 p-4 text-left text-sky-800 transition hover:border-sky-300 dark:border-sky-900/70 dark:bg-sky-950/40 dark:text-sky-300 dark:hover:border-sky-800"
             >
-              <span className="notice-icon grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"><ClipboardCheck className="h-5 w-5" /></span>
+              <span className="notice-icon grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300"><ClipboardCheck className="h-5 w-5" /></span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-black text-amber-950 dark:text-amber-100">{pendingRecords.length} pending approval{pendingRecords.length === 1 ? '' : 's'}</span>
-                <span className="mt-0.5 block text-[11px] text-amber-700 dark:text-amber-300/80">Review submitted records before they enter official reports.</span>
+                <span className="block text-sm font-black text-sky-950 dark:text-sky-100">{pendingRecords.length} pending approval{pendingRecords.length === 1 ? '' : 's'}</span>
+                <span className="mt-0.5 block text-[11px] text-sky-700 dark:text-sky-300/80">Review submitted records before they enter official reports.</span>
               </span>
-              <ArrowRight className="notice-arrow h-4 w-4 shrink-0 text-amber-600" />
+              <ArrowRight className="notice-arrow h-4 w-4 shrink-0 text-sky-600" />
             </button>
           )}
           {returnedRecords.length > 0 && (
@@ -204,7 +209,7 @@ export const DashboardPage = ({ setActiveTab, isDarkMode }) => {
               <h2 className="text-sm font-black text-slate-950 dark:text-white">Approved Passing Rate by Academic Unit</h2>
               <p className="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">Only dean/VPAA-approved records are included.</p>
             </div>
-            <span className="w-fit rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[10px] font-bold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950 dark:text-indigo-300">{activeAcademicYear}</span>
+            <span className="w-fit rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[10px] font-bold text-sky-700 dark:border-sky-800 dark:bg-sky-950 dark:text-sky-300">{activeAcademicYear}</span>
           </div>
 
           <div className="mt-4 h-64 w-full sm:h-72">
@@ -213,15 +218,15 @@ export const DashboardPage = ({ setActiveTab, isDarkMode }) => {
                 <BarChart data={departmentChartData} margin={{ top: 10, right: 8, left: -22, bottom: 6 }}>
                   <defs>
                     <linearGradient id="passingRateGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#6366f1" />
-                      <stop offset="100%" stopColor="#4338ca" />
+                      <stop offset="0%" stopColor="#38bdf8" />
+                      <stop offset="100%" stopColor="#0284c7" />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={isDarkMode ? '#334155' : '#e2e8f0'} />
                   <XAxis dataKey="department" tick={{ fontSize: 10, fill: isDarkMode ? '#94a3b8' : '#64748b' }} interval={0} angle={departmentChartData.length > 4 ? -12 : 0} textAnchor={departmentChartData.length > 4 ? 'end' : 'middle'} height={departmentChartData.length > 4 ? 55 : 35} />
                   <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: isDarkMode ? '#94a3b8' : '#64748b' }} unit="%" />
                   <Tooltip
-                    cursor={{ fill: isDarkMode ? 'rgba(129, 140, 248, 0.08)' : 'rgba(79, 70, 229, 0.05)' }}
+                    cursor={{ fill: isDarkMode ? 'rgba(56, 189, 248, 0.08)' : 'rgba(2, 132, 199, 0.05)' }}
                     formatter={(value) => [`${value}%`, 'Passing rate']}
                     labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName || ''}
                     contentStyle={{
@@ -238,7 +243,7 @@ export const DashboardPage = ({ setActiveTab, isDarkMode }) => {
                     radius={[8, 8, 0, 0]}
                     maxBarSize={58}
                     animationDuration={720}
-                    activeBar={{ fill: '#818cf8', stroke: isDarkMode ? '#c7d2fe' : '#4f46e5', strokeWidth: 1 }}
+                    activeBar={{ fill: '#7dd3fc', stroke: isDarkMode ? '#bae6fd' : '#0284c7', strokeWidth: 1 }}
                   />
                 </BarChart>
               </ResponsiveContainer>

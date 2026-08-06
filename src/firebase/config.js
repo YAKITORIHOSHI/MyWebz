@@ -1,8 +1,8 @@
-import { initializeApp } from 'firebase/app';
-import { initializeAuth, browserLocalPersistence, inMemoryPersistence } from 'firebase/auth';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getAuth, initializeAuth, browserLocalPersistence, inMemoryPersistence } from 'firebase/auth';
 import { getDatabase } from 'firebase/database';
 
-// City College of Tagaytay Firebase Credentials Configuration
+// Natsuki College of Imus Firebase Credentials Configuration
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "AIzaSyABXspXcQOGHxVCHTM5IdNp6XIazui1CVk",
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "academicdashboarddata.firebaseapp.com",
@@ -13,29 +13,25 @@ const firebaseConfig = {
   databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL || "https://academicdashboarddata-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
 
-// Session persistence strategy:
-// - Default: inMemoryPersistence (tab close = instant logout, no IndexedDB)
-// - "Keep me signed in": browserLocalPersistence (session survives tab/browser close)
 const KEEP_SIGNED_IN_KEY = 'cct_keep_signed_in';
-const userWantsToStaySignedIn = localStorage.getItem(KEEP_SIGNED_IN_KEY) === 'true';
 
-let app, auth, rtdb;
-let isFirebaseInitialized = false;
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
+let auth;
 try {
-  app = initializeApp(firebaseConfig);
-
-  // initializeAuth (not getAuth) ensures persistence is set BEFORE any cached session is loaded.
-  // This is the critical difference: getAuth() loads IndexedDB sessions first, then setPersistence changes future behavior.
-  // initializeAuth() sets persistence from the start, so inMemoryPersistence means NO cached session is ever read.
-  auth = initializeAuth(app, {
-    persistence: userWantsToStaySignedIn ? browserLocalPersistence : inMemoryPersistence
-  });
-
-  rtdb = getDatabase(app);
-  isFirebaseInitialized = true;
-} catch (error) {
-  console.warn("Firebase initialization error:", error);
+  auth = getAuth(app);
+} catch (e) {
+  try {
+    const userWantsToStaySignedIn = typeof window !== 'undefined' && localStorage.getItem(KEEP_SIGNED_IN_KEY) === 'true';
+    auth = initializeAuth(app, {
+      persistence: userWantsToStaySignedIn ? browserLocalPersistence : inMemoryPersistence
+    });
+  } catch (err) {
+    auth = getAuth(app);
+  }
 }
+
+const rtdb = getDatabase(app);
+const isFirebaseInitialized = Boolean(app && auth && rtdb);
 
 export { app, auth, rtdb, firebaseConfig, isFirebaseInitialized, KEEP_SIGNED_IN_KEY };

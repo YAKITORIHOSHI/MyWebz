@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { CustomSelect } from '../components/common/CustomSelect';
 import {
   Award,
   BarChart3,
@@ -10,6 +11,7 @@ import {
   Filter,
   GraduationCap,
   Printer,
+  ShieldCheck,
   TrendingUp
 } from 'lucide-react';
 import {
@@ -24,10 +26,12 @@ import {
 } from 'recharts';
 import { RECORD_STATUS, SEMESTER_OPTIONS } from '../utils/academic';
 
-const shortDepartmentName = (department) => department
-  .replace('School of ', '')
-  .replace('Research & Development Office (RDO)', 'RDO')
-  .replace(' (Informatics)', '');
+const shortDepartmentName = (department) => {
+  const name = typeof department === 'string'
+    ? department
+    : (department?.name || department?.id || String(department || ''));
+  return name.replace(/^School of\s+/i, '').replace(/^Office of\s+/i, '');
+};
 
 const csvCell = (value) => `"${String(value ?? '').replace(/"/g, '""')}"`;
 
@@ -80,13 +84,14 @@ export const ReportsPage = ({ isDarkMode }) => {
 
   const handleExportCSV = () => {
     const headers = [
-      'ID', 'Department', 'Academic Year', 'Semester', 'Subject Code', 'Subject Title',
+      'ID', 'Department', 'Program', 'Academic Year', 'Semester', 'Subject Code', 'Subject Title',
       'Enrolled', 'Passed', 'Failed', 'Dropped', 'Incomplete', 'Passing Rate (%)',
       'Average Grade', 'Encoded By', 'Approved By', 'Approved At', 'Review Note', 'Updated At'
     ];
     const rows = filtered.map((record) => [
       record.id,
       record.department,
+      record.programName || 'Department-wide',
       record.academicYear,
       record.semester,
       record.subjectCode,
@@ -110,7 +115,7 @@ export const ReportsPage = ({ isDarkMode }) => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `CCT_Approved_Academic_Report_${selectedAY.replace(/\s+/g, '_')}.csv`;
+    link.download = `NCI_Approved_Academic_Report_${selectedAY.replace(/\s+/g, '_')}.csv`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -119,57 +124,90 @@ export const ReportsPage = ({ isDarkMode }) => {
 
   return (
     <div className="page-stack space-y-4 sm:space-y-5">
-      <section className="surface-panel rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-5 print:hidden">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="mb-1 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">
+      <section className="hero-panel hero-motion relative overflow-hidden rounded-3xl border border-sky-500/30 bg-gradient-to-br from-slate-950 via-blue-950 to-sky-950 p-5 text-white sm:p-6 lg:p-7 shadow-xl shadow-sky-950/40 print:hidden">
+        <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-sky-500/25 blur-3xl" />
+        <div className="absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-blue-600/20 blur-3xl" />
+        <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-sky-400">
               <BarChart3 className="h-4 w-4" />
-              Official reports
+              Official analytics & reports
             </div>
-            <h1 className="text-xl font-black tracking-tight text-slate-950 dark:text-white sm:text-2xl">Approved Academic Performance</h1>
-            <p className="mt-1 max-w-3xl text-xs leading-relaxed text-slate-500 dark:text-slate-400">
+            <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Approved Academic Performance</h1>
+            <p className="mt-2 max-w-3xl text-xs leading-relaxed text-sky-100/90 sm:text-sm">
               Reports exclude pending and returned records. Every included row has completed dean or VPAA approval.
             </p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-blue-900/40 px-3 py-1.5 text-[10px] font-bold text-sky-200">
+                <ShieldCheck className="h-3.5 w-3.5 text-sky-400" /> {currentUser?.role}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-blue-900/40 px-3 py-1.5 text-[10px] font-bold text-sky-200">
+                <FileCheck className="h-3.5 w-3.5 text-emerald-400" /> Approved rows: {filtered.length}
+              </span>
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:flex">
-            <button type="button" onClick={handleExportCSV} disabled={filtered.length === 0} className="control-lift button-shine inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 text-xs font-bold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-slate-800 dark:hover:bg-slate-700">
+
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+            <button
+              type="button"
+              onClick={handleExportCSV}
+              disabled={filtered.length === 0}
+              className="glass-control control-lift min-h-11 rounded-xl border border-sky-400/30 bg-blue-950/40 px-4 text-xs font-bold text-sky-200 transition hover:bg-blue-900/60 disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
+            >
               <Download className="h-4 w-4" /> Export CSV
             </button>
-            <button type="button" onClick={() => window.print()} className="primary-action button-shine inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 text-xs font-bold text-white transition hover:bg-indigo-700">
-              <Printer className="h-4 w-4" /> Print
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="hero-action button-shine inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-sky-400 to-blue-500 hover:from-sky-300 hover:to-blue-400 px-4 text-xs font-black text-slate-950 transition shadow-lg shadow-sky-500/25 cursor-pointer"
+            >
+              <Printer className="h-4 w-4" /> Print Report
             </button>
           </div>
         </div>
       </section>
 
-      <section className="surface-panel surface-panel-hover rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 sm:p-4 print:hidden">
+      <section className="surface-panel surface-panel-hover relative z-30 rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 sm:p-4 print:hidden">
         <div className="mb-3 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
           <Filter className="h-4 w-4 text-indigo-500" /> Report scope
         </div>
         <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-          <select value={selectedAY} onChange={(event) => setSelectedAY(event.target.value)} className="form-control">
-            <option value="ALL">All approved academic years</option>
-            {academicYears.map((year) => <option key={year} value={year}>{year}</option>)}
-          </select>
-          <select value={selectedSem} onChange={(event) => setSelectedSem(event.target.value)} className="form-control">
-            <option value="ALL">All semesters</option>
-            {SEMESTER_OPTIONS.map((semester) => <option key={semester} value={semester}>{semester}</option>)}
-          </select>
+          <CustomSelect
+            value={selectedAY}
+            onChange={setSelectedAY}
+            options={[
+              { value: 'ALL', label: 'All approved academic years' },
+              ...academicYears.map((year) => ({ value: year, label: year }))
+            ]}
+          />
+          <CustomSelect
+            value={selectedSem}
+            onChange={setSelectedSem}
+            options={[
+              { value: 'ALL', label: 'All semesters' },
+              ...SEMESTER_OPTIONS.map((semester) => ({ value: semester, label: semester }))
+            ]}
+          />
           {permissions.canViewAllDepartments ? (
-            <select value={selectedDept} onChange={(event) => setSelectedDept(event.target.value)} className="form-control sm:col-span-2 lg:col-span-1">
-              <option value="ALL">All academic units</option>
-              {departments.map((department) => <option key={department} value={department}>{department}</option>)}
-            </select>
+            <CustomSelect
+              className="sm:col-span-2 lg:col-span-1"
+              value={selectedDept}
+              onChange={setSelectedDept}
+              options={[
+                { value: 'ALL', label: 'All academic units' },
+                ...departments.map((department) => ({ value: department, label: department }))
+              ]}
+            />
           ) : (
             <div className="form-control flex items-center gap-2 bg-slate-50 text-[11px] font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300 sm:col-span-2 lg:col-span-1">
-              <Building2 className="h-4 w-4 shrink-0 text-indigo-500" /><span className="truncate">{currentUser.department}</span>
+              <Building2 className="h-4 w-4 shrink-0 text-indigo-500" /><span className="truncate">{currentUser?.department || ''}</span>
             </div>
           )}
         </div>
       </section>
 
       <div className="hidden border-b-2 border-slate-900 pb-4 text-center print:block">
-        <h1 className="text-xl font-black uppercase tracking-wider text-slate-900">City College of Tagaytay</h1>
+        <h1 className="text-xl font-black uppercase tracking-wider text-slate-900">Natsuki College of Imus</h1>
         <h2 className="mt-1 text-sm font-bold text-slate-700">Office of the Vice President for Academic Affairs</h2>
         <p className="mt-1 text-xs text-slate-500">Approved Academic Performance Report — {selectedAY === 'ALL' ? 'All Academic Years' : selectedAY}</p>
       </div>
@@ -282,7 +320,7 @@ export const ReportsPage = ({ isDarkMode }) => {
               {filtered.map((record) => (
                 <tr key={record.id} className="table-row-lift transition hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
                   <td className="px-4 py-3.5"><div className="font-mono font-black text-indigo-700 dark:text-indigo-300">{record.subjectCode}</div><div className="mt-0.5 text-slate-600 dark:text-slate-300 font-semibold">{record.subjectTitle}</div></td>
-                  <td className="max-w-[15rem] px-4 py-3.5 text-slate-600 dark:text-slate-300">{record.department}</td>
+                  <td className="max-w-[15rem] px-4 py-3.5 text-slate-600 dark:text-slate-300"><div>{record.department}</div><div className="mt-1 text-[10px] font-bold text-sky-600 dark:text-sky-300">{record.programName || 'Department-wide'}</div></td>
                   <td className="px-4 py-3.5 text-slate-500">{record.academicYear}<br /><span className="text-[11px]">{record.semester}</span></td>
                   <td className="px-4 py-3.5 text-right font-mono font-bold">{record.enrolledCount}</td>
                   <td className="px-4 py-3.5 text-right font-mono font-bold text-emerald-600 dark:text-emerald-400">{record.passedCount}</td>

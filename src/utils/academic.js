@@ -4,14 +4,6 @@ export const SEMESTER_OPTIONS = [
   'Midyear / Summer'
 ];
 
-export const CCT_DEPARTMENTS = [
-  'School of Computer Studies (Informatics)',
-  'School of Business and Management',
-  'School of Engineering',
-  'School of Medical Technology',
-  'School of Nursing',
-  'Research & Development Office (RDO)'
-];
 
 export const getCurrentAcademicYear = (date = new Date()) => {
   const year = date.getFullYear();
