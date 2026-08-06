@@ -100,20 +100,29 @@ export const DashboardPage = ({ setActiveTab, isDarkMode }) => {
         <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-sky-500/25 blur-3xl" />
         <div className="absolute -bottom-28 left-1/3 h-64 w-64 rounded-full bg-blue-600/20 blur-3xl" />
         <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <div className="mb-2 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-sky-400">
-              <Building2 className="h-4 w-4" />
-              Academic affairs command center
+          <div className="flex min-w-0 items-start gap-4">
+            <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl border-2 border-sky-400/50 bg-gradient-to-br from-blue-900 via-sky-900 to-slate-900 text-xl font-black text-sky-100 shadow-xl shadow-sky-950/60 ring-2 ring-sky-400/20 sm:h-16 sm:w-16 sm:text-2xl">
+              {currentUser?.avatarUrl ? (
+                <img src={currentUser.avatarUrl} alt={currentUser.name} className="h-full w-full object-cover object-center" />
+              ) : (
+                currentUser?.name?.charAt(0) || 'U'
+              )}
             </div>
-            <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Welcome, {currentUser?.name}</h1>
-            <p className="mt-2 max-w-3xl text-xs leading-relaxed text-sky-100/90 sm:text-sm">{roleDescription}</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-blue-900/40 px-3 py-1.5 text-[10px] font-bold text-sky-200">
-                <ShieldCheck className="h-3.5 w-3.5 text-sky-400" /> {currentUser?.role}
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-blue-900/40 px-3 py-1.5 text-[10px] font-bold text-sky-200">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Reporting cycle: {activeAcademicYear}
-              </span>
+            <div className="min-w-0">
+              <div className="mb-1 flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-sky-400">
+                <Building2 className="h-4 w-4" />
+                Academic affairs command center
+              </div>
+              <h1 className="text-2xl font-black tracking-tight sm:text-3xl">Welcome, {currentUser?.name}</h1>
+              <p className="mt-2 max-w-3xl text-xs leading-relaxed text-sky-100/90 sm:text-sm">{roleDescription}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-blue-900/40 px-3 py-1.5 text-[10px] font-bold text-sky-200">
+                  <ShieldCheck className="h-3.5 w-3.5 text-sky-400" /> {currentUser?.role}
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-sky-400/30 bg-blue-900/40 px-3 py-1.5 text-[10px] font-bold text-sky-200">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" /> Reporting cycle: {activeAcademicYear}
+                </span>
+              </div>
             </div>
           </div>
 
