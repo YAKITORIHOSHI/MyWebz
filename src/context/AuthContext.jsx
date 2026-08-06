@@ -775,8 +775,28 @@ export const AuthProvider = ({ children }) => {
         };
       }
 
+      // 1. Delete all previous avatar files belonging to this user in Supabase Storage
+      try {
+        const { data: existingFiles } = await supabase.storage
+          .from(BUCKET_NAME)
+          .list('', { search: currentUser.id });
+
+        if (existingFiles && existingFiles.length > 0) {
+          const filesToRemove = existingFiles
+            .filter((f) => f.name && f.name.startsWith(currentUser.id))
+            .map((f) => f.name);
+
+          if (filesToRemove.length > 0) {
+            await supabase.storage.from(BUCKET_NAME).remove(filesToRemove);
+          }
+        }
+      } catch (cleanupErr) {
+        console.warn('Supabase storage old file list/remove cleanup note:', cleanupErr);
+      }
+
+      // 2. Upload the new profile picture file
       const fileExt = file.name.split('.').pop() || 'png';
-      const filePath = `${currentUser.id}.${fileExt}`;
+      const filePath = `${currentUser.id}_${Date.now()}.${fileExt}`;
 
       const { data, error: uploadError } = await supabase.storage
         .from(BUCKET_NAME)
@@ -804,7 +824,7 @@ export const AuthProvider = ({ children }) => {
       const result = await updateAccount(currentUser.id, { avatarUrl });
 
       return result.success
-        ? { success: true, avatarUrl, message: 'Profile picture updated successfully.' }
+        ? { success: true, avatarUrl, message: 'Profile picture updated and previous files removed.' }
         : result;
     } catch (err) {
       console.warn('Supabase Avatar Upload Error:', err);
