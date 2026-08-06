@@ -791,25 +791,26 @@ export const AuthProvider = ({ children }) => {
         };
       }
 
-      const oldAvatarUrl = currentUser?.avatarUrl;
-
-      const fileExt = file.name.split('.').pop();
-      const filePath = `${currentUser.id}_${Date.now()}.${fileExt}`;
+      const fileExt = file.name.split('.').pop() || 'png';
+      const filePath = `${currentUser.id}.${fileExt}`;
 
       const { data, error: uploadError } = await supabase.storage
         .from(BUCKET_NAME)
-        .upload(filePath, file, { upsert: true });
+        .upload(filePath, file, { upsert: true, cacheControl: '0' });
 
       if (uploadError) {
         return { success: false, message: uploadError.message || 'Supabase Storage upload failed.' };
       }
 
       const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(filePath);
-      const avatarUrl = urlData?.publicUrl;
+      const baseUrl = urlData?.publicUrl;
 
-      if (!avatarUrl) {
+      if (!baseUrl) {
         return { success: false, message: 'Could not obtain public URL for uploaded profile picture.' };
       }
+
+      // Add timestamp cache-buster so browsers immediately reload updated avatars
+      const avatarUrl = `${baseUrl}?v=${Date.now()}`;
 
       // 1. Sync avatar URL to Firebase Realtime Database under user_avatars node
       const emailKey = currentUser.email?.toLowerCase()?.replace(/[\.\#\$\[\]]/g, '_');
@@ -831,24 +832,8 @@ export const AuthProvider = ({ children }) => {
 
       const result = await updateAccount(currentUser.id, { avatarUrl });
 
-      // Clean up previous profile picture file from Supabase Storage bucket
-      if (result.success && oldAvatarUrl) {
-        try {
-          const bucketSegment = `/storage/v1/object/public/${BUCKET_NAME}/`;
-          const oldFilePath = oldAvatarUrl.includes(bucketSegment)
-            ? oldAvatarUrl.split(bucketSegment)[1]
-            : oldAvatarUrl.split('/').pop();
-
-          if (oldFilePath && oldFilePath !== filePath) {
-            await supabase.storage.from(BUCKET_NAME).remove([oldFilePath]);
-          }
-        } catch (cleanupErr) {
-          console.warn('Supabase Storage old avatar cleanup note:', cleanupErr);
-        }
-      }
-
       return result.success
-        ? { success: true, avatarUrl, message: 'Profile picture updated and previous image removed.' }
+        ? { success: true, avatarUrl, message: 'Profile picture updated successfully.' }
         : result;
     } catch (err) {
       console.warn('Supabase Avatar Upload Error:', err);
