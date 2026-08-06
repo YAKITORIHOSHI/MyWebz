@@ -775,19 +775,28 @@ export const AuthProvider = ({ children }) => {
         };
       }
 
-      // 1. Delete all previous avatar files belonging to this user in Supabase Storage
+      // 1. Delete all previous avatar files belonging to this user in Supabase Storage across all file extensions
       try {
+        const defaultExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+        const targetFiles = defaultExts.map((ext) => `${currentUser.id}.${ext}`);
+
         const { data: existingFiles } = await supabase.storage
           .from(BUCKET_NAME)
-          .list('', { search: currentUser.id });
+          .list('', { limit: 100 });
 
-        if (existingFiles && existingFiles.length > 0) {
-          const filesToRemove = existingFiles
-            .filter((f) => f.name && f.name.startsWith(currentUser.id))
-            .map((f) => f.name);
+        const listedFiles = (existingFiles || [])
+          .filter((f) => f.name && f.name.startsWith(currentUser.id))
+          .map((f) => f.name);
 
-          if (filesToRemove.length > 0) {
-            await supabase.storage.from(BUCKET_NAME).remove(filesToRemove);
+        const filesToRemove = Array.from(new Set([...targetFiles, ...listedFiles]));
+
+        if (filesToRemove.length > 0) {
+          const { error: removeErr } = await supabase.storage
+            .from(BUCKET_NAME)
+            .remove(filesToRemove);
+
+          if (removeErr) {
+            console.warn('Supabase storage remove note:', removeErr.message);
           }
         }
       } catch (cleanupErr) {
