@@ -101,22 +101,23 @@ const AccountPanel = ({ onClose }) => {
       {/* Header */}
       <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-br from-blue-950/20 to-transparent px-5 py-4 dark:border-slate-800">
         <div className="flex items-center gap-3">
-          <label className="group relative grid h-12 w-12 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-xl border border-sky-400/40 bg-gradient-to-br from-blue-900 to-sky-700 text-base font-black text-sky-100 shadow-md">
+          <label className="group relative flex h-12 w-12 shrink-0 aspect-square cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-sky-400/40 bg-gradient-to-br from-blue-900 to-sky-700 text-base font-black text-sky-100 shadow-md">
             <input
               type="file"
               accept="image/*"
-              className="hidden"
+              className="absolute inset-0 h-full w-full opacity-0 cursor-pointer z-10"
               onChange={handleAvatarSelect}
               disabled={isUploadingAvatar}
+              title="Upload profile picture"
             />
             {isUploadingAvatar ? (
               <LoaderCircle className="h-5 w-5 animate-spin text-sky-300" />
             ) : currentUser?.avatarUrl ? (
-              <img src={currentUser.avatarUrl} alt={currentUser.name} className="h-full w-full object-cover transition group-hover:opacity-75" />
+              <img src={currentUser.avatarUrl} alt={currentUser.name} className="h-full w-full aspect-square object-cover object-center transition group-hover:opacity-75" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
             ) : (
               currentUser?.name?.charAt(0) || 'U'
             )}
-            <div className="absolute inset-0 flex items-center justify-center bg-slate-950/60 opacity-0 transition group-hover:opacity-100">
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-950/60 opacity-0 transition group-hover:opacity-100 pointer-events-none">
               <Camera className="h-4 w-4 text-sky-300" />
             </div>
           </label>
@@ -302,9 +303,9 @@ export const Sidebar = ({ activeTab, setActiveTab, isMobileMenuOpen, setIsMobile
         aria-label="Open account management"
       >
         <div className="flex min-w-0 items-center gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl border border-sky-400/40 bg-gradient-to-br from-blue-900 to-sky-700 text-sm font-black text-sky-100 shadow-md">
+          <div className="flex h-10 w-10 shrink-0 aspect-square items-center justify-center overflow-hidden rounded-xl border border-sky-400/40 bg-gradient-to-br from-blue-900 to-sky-700 text-sm font-black text-sky-100 shadow-md">
             {currentUser?.avatarUrl ? (
-              <img src={currentUser.avatarUrl} alt={currentUser.name} className="h-full w-full object-cover object-center" />
+              <img src={currentUser.avatarUrl} alt={currentUser.name} className="h-full w-full aspect-square object-cover object-center" />
             ) : (
               currentUser?.name?.charAt(0) || 'U'
             )}

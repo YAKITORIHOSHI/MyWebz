@@ -114,7 +114,7 @@ export const LoginPage = () => {
                 type="email"
                 required
                 autoComplete="username email"
-                placeholder="vpaa.imus@college.cvt.edu"
+                placeholder="Enter your institutional email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onBlur={(e) => setEmail(e.target.value)}

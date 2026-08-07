@@ -130,9 +130,9 @@ export const Navbar = ({ setActiveTab, isMobileMenuOpen, setIsMobileMenuOpen, is
             aria-haspopup="menu"
             aria-label="Open user account menu"
           >
-            <span className="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-lg border border-sky-400/40 bg-gradient-to-br from-blue-900 to-sky-700 text-xs font-black text-sky-200">
+            <span className="flex h-7 w-7 shrink-0 aspect-square items-center justify-center overflow-hidden rounded-lg border border-sky-400/40 bg-gradient-to-br from-blue-900 to-sky-700 text-xs font-black text-sky-200">
               {currentUser?.avatarUrl ? (
-                <img src={currentUser.avatarUrl} alt={currentUser.name} className="h-full w-full object-cover object-center" />
+                <img src={currentUser.avatarUrl} alt={currentUser.name} className="h-full w-full aspect-square object-cover object-center" />
               ) : (
                 currentUser?.name?.charAt(0) || 'U'
               )}
@@ -156,9 +156,9 @@ export const Navbar = ({ setActiveTab, isMobileMenuOpen, setIsMobileMenuOpen, is
         >
           <div className="border-b border-slate-100 bg-gradient-to-br from-blue-950/10 to-transparent p-4 dark:border-slate-800">
             <div className="flex items-center gap-3">
-              <span className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl border border-sky-400/40 bg-gradient-to-br from-blue-900 to-sky-700 text-sm font-black text-sky-200">
+              <span className="flex h-10 w-10 shrink-0 aspect-square items-center justify-center overflow-hidden rounded-xl border border-sky-400/40 bg-gradient-to-br from-blue-900 to-sky-700 text-sm font-black text-sky-200">
                 {currentUser?.avatarUrl ? (
-                  <img src={currentUser.avatarUrl} alt={currentUser.name} className="h-full w-full object-cover object-center" />
+                  <img src={currentUser.avatarUrl} alt={currentUser.name} className="h-full w-full aspect-square object-cover object-center" />
                 ) : (
                   currentUser?.name?.charAt(0) || 'U'
                 )}

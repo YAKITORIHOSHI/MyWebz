@@ -233,9 +233,9 @@ export const AccountsPage = () => {
                 <tr key={user.id} className="table-row-lift transition hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
                   <td className="px-4 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-xl bg-slate-100 text-xs font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                      <div className="flex h-9 w-9 shrink-0 aspect-square items-center justify-center overflow-hidden rounded-xl bg-slate-100 text-xs font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                         {user.avatarUrl ? (
-                          <img src={user.avatarUrl} alt={user.name} className="h-full w-full object-cover object-center" />
+                          <img src={user.avatarUrl} alt={user.name} className="h-full w-full aspect-square object-cover object-center" />
                         ) : (
                           user.name.charAt(0)
                         )}
@@ -259,9 +259,9 @@ export const AccountsPage = () => {
         {filteredAccounts.map((user) => (
           <article key={user.id} className="surface-panel surface-panel-hover interactive-surface rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
             <div className="flex items-start gap-3">
-              <div className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl bg-slate-100 text-sm font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              <div className="flex h-11 w-11 shrink-0 aspect-square items-center justify-center overflow-hidden rounded-xl bg-slate-100 text-sm font-black text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                 {user.avatarUrl ? (
-                  <img src={user.avatarUrl} alt={user.name} className="h-full w-full object-cover object-center" />
+                  <img src={user.avatarUrl} alt={user.name} className="h-full w-full aspect-square object-cover object-center" />
                 ) : (
                   user.name.charAt(0)
                 )}

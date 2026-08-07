@@ -313,6 +313,32 @@ export const AuthProvider = ({ children }) => {
     return [];
   };
 
+  const resolveUserAvatarFromStorage = async (acc) => {
+    if (!acc || !acc.id || acc.avatarUrl) return acc?.avatarUrl || '';
+    try {
+      const { supabase, isSupabaseConfigured, BUCKET_NAME } = await import('../supabase/client');
+      if (!isSupabaseConfigured || !supabase) return '';
+      const { data: existingFiles } = await supabase.storage
+        .from(BUCKET_NAME)
+        .list('', { limit: 100 });
+      const matchedFile = (existingFiles || []).find((f) => f.name && f.name.startsWith(acc.id));
+      if (matchedFile) {
+        const { data: urlData } = supabase.storage.from(BUCKET_NAME).getPublicUrl(matchedFile.name);
+        if (urlData?.publicUrl) {
+          const resolvedUrl = `${urlData.publicUrl}?v=${Date.now()}`;
+          try { localStorage.setItem(`nci_user_avatar_${acc.id}`, resolvedUrl); } catch (e) {}
+          if (isFirebaseInitialized && rtdb) {
+            rtdbSet(rtdbRef(rtdb, `accounts/${acc.id}/avatarUrl`), resolvedUrl).catch(() => {});
+          }
+          return resolvedUrl;
+        }
+      }
+    } catch (e) {
+      console.warn('Avatar resolution from Supabase Storage skipped:', e);
+    }
+    return '';
+  };
+
   const accountsRef = React.useRef(accounts);
   accountsRef.current = accounts;
 
@@ -359,13 +385,21 @@ export const AuthProvider = ({ children }) => {
 
         accountsRef.current = list;
         setAccounts(list);
-        const matched = list.find((account) => account.email?.toLowerCase() === firebaseUser.email?.toLowerCase());
+        let matched = list.find((account) => account.email?.toLowerCase() === firebaseUser.email?.toLowerCase());
 
         if (!matched || matched.status === 'Suspended') {
           setIsAuthenticated(false);
           setCurrentUser(null);
           await firebaseSignOut(auth);
           return;
+        }
+
+        if (!matched.avatarUrl && matched.id) {
+          const resolvedAvatar = await resolveUserAvatarFromStorage(matched);
+          if (resolvedAvatar) {
+            matched = { ...matched, avatarUrl: resolvedAvatar };
+            setAccounts((prev) => prev.map((a) => a.id === matched.id ? matched : a));
+          }
         }
 
         setCurrentUser(matched);
@@ -441,7 +475,7 @@ export const AuthProvider = ({ children }) => {
     const startSubscriptions = () => {
       if (cancelled) return;
 
-      subscriptions.push(onValue(rtdbRef(rtdb, 'accounts'), (snapshot) => {
+      subscriptions.push(onValue(rtdbRef(rtdb, 'accounts'), async (snapshot) => {
         let list = parseRtdbSnapshot(snapshot);
 
         list = list.map((acc) => ({
@@ -451,7 +485,7 @@ export const AuthProvider = ({ children }) => {
 
         accountsRef.current = list;
         setAccounts(list);
-        const matched = list.find((account) => account.email?.toLowerCase() === auth.currentUser?.email?.toLowerCase());
+        let matched = list.find((account) => account.email?.toLowerCase() === auth.currentUser?.email?.toLowerCase());
         if (!matched || matched.status === 'Suspended') {
           setIsAuthenticated(false);
           setCurrentUser(null);
@@ -459,9 +493,31 @@ export const AuthProvider = ({ children }) => {
           return;
         }
 
+        if (matched.id && matched.avatarUrl) {
+          try { localStorage.setItem(`nci_user_avatar_${matched.id}`, matched.avatarUrl); } catch (e) {}
+        } else if (matched.id && !matched.avatarUrl) {
+          const resolvedAvatar = await resolveUserAvatarFromStorage(matched);
+          if (resolvedAvatar) {
+            matched = { ...matched, avatarUrl: resolvedAvatar };
+            setAccounts((prev) => prev.map((a) => a.id === matched.id ? matched : a));
+          }
+        }
+
         const cachedAvatar = matched.id ? localStorage.getItem(`nci_user_avatar_${matched.id}`) : null;
         const finalAvatar = matched.avatarUrl || cachedAvatar || '';
         setCurrentUser({ ...matched, avatarUrl: finalAvatar });
+
+        // Asynchronously check missing avatars for all directory accounts in background
+        list.forEach((acc) => {
+          if (acc.id && !acc.avatarUrl) {
+            void resolveUserAvatarFromStorage(acc).then((resUrl) => {
+              if (resUrl && !cancelled) {
+                setAccounts((prev) => prev.map((item) => item.id === acc.id ? { ...item, avatarUrl: resUrl } : item));
+              }
+            });
+          }
+        });
+
         markCollectionReady('accounts');
       }, handleReadError('accounts')));
 
@@ -733,11 +789,11 @@ export const AuthProvider = ({ children }) => {
           name: String(updatedData.name ?? existing.name).trim(),
           role: updatedData.role ?? existing.role,
           department: String(updatedData.department ?? existing.department).trim(),
-          ...(updatedData.avatarUrl !== undefined ? { avatarUrl: updatedData.avatarUrl } : {})
+          avatarUrl: updatedData.avatarUrl !== undefined ? updatedData.avatarUrl : (existing.avatarUrl || '')
         }
       : {
           name: String(updatedData.name ?? existing.name).trim(),
-          ...(updatedData.avatarUrl !== undefined ? { avatarUrl: updatedData.avatarUrl } : {})
+          avatarUrl: updatedData.avatarUrl !== undefined ? updatedData.avatarUrl : (existing.avatarUrl || '')
         };
 
     if (!safeData.name) return { success: false, message: 'Display name cannot be empty.' };
@@ -762,6 +818,56 @@ export const AuthProvider = ({ children }) => {
     return { success: true, account: updatedAccount };
   };
 
+  const compressImageForAvatar = (file, maxSize = 1024) => {
+    return new Promise((resolve) => {
+      if (!file || !file.type || !file.type.startsWith('image/')) {
+        resolve(file);
+        return;
+      }
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const minDim = Math.min(img.width, img.height);
+        const sx = (img.width - minDim) / 2;
+        const sy = (img.height - minDim) / 2;
+        const targetSize = Math.min(minDim, maxSize);
+
+        const canvas = document.createElement('canvas');
+        canvas.width = targetSize;
+        canvas.height = targetSize;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, targetSize, targetSize);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              resolve(file);
+              return;
+            }
+            const resizedFile = new File([blob], (file.name || 'avatar').replace(/\.[^/.]+$/, '') + '.jpg', {
+              type: 'image/jpeg',
+              lastModified: Date.now()
+            });
+            resolve(resizedFile);
+          },
+          'image/jpeg',
+          0.92
+        );
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(file);
+      };
+      img.src = url;
+    });
+  };
+
   const uploadAvatar = async (file) => {
     if (!currentUser?.id) return { success: false, message: 'Must be logged in to upload avatar.' };
     if (!file) return { success: false, message: 'No file selected.' };
@@ -775,7 +881,10 @@ export const AuthProvider = ({ children }) => {
         };
       }
 
-      // 1. Delete all previous avatar files belonging to this user in Supabase Storage across all file extensions
+      // 1. Compress high-res mobile photos (iPhone HEIC/JPEG or Android Camera photos)
+      const compressedFile = await compressImageForAvatar(file);
+
+      // 2. Delete all previous avatar files belonging to this user in Supabase Storage across all file extensions
       try {
         const defaultExts = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
         const targetFiles = defaultExts.map((ext) => `${currentUser.id}.${ext}`);
@@ -803,13 +912,14 @@ export const AuthProvider = ({ children }) => {
         console.warn('Supabase storage old file list/remove cleanup note:', cleanupErr);
       }
 
-      // 2. Upload the new profile picture file
-      const fileExt = file.name.split('.').pop() || 'png';
+      // 3. Upload the new compressed profile picture file
+      const rawExt = (compressedFile.name || file.name || 'avatar.jpg').split('.').pop() || 'jpg';
+      const fileExt = rawExt.toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
       const filePath = `${currentUser.id}_${Date.now()}.${fileExt}`;
 
       const { data, error: uploadError } = await supabase.storage
         .from(BUCKET_NAME)
-        .upload(filePath, file, { upsert: true, cacheControl: '0' });
+        .upload(filePath, compressedFile, { upsert: true, cacheControl: '0', contentType: compressedFile.type || 'image/jpeg' });
 
       if (uploadError) {
         return { success: false, message: uploadError.message || 'Supabase Storage upload failed.' };
